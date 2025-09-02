@@ -121,6 +121,9 @@ jobs:
     name: Test Promote Version Action
     needs: test-generate-version-action
     runs-on: kubernetes-runner
+    permissions:
+      contents: read
+      actions: read
     steps:
     - name: Checkout code
       uses: actions/checkout@v5
@@ -132,7 +135,7 @@ jobs:
         LIST_RUNNING_WORKFLOWS: "true"  # To be able to retrieve artifacts from the current workflow run
       with:
         python-version: ${{ env.PYTHON_VERSION }}
-        github-token: ${{ secrets.GITHUB_TOKEN }}
+        github-token: ${{ env.GITHUB_TOKEN }}
 
     - name: Verify promote-version output
       run: |
