@@ -18,23 +18,28 @@ github_token = os.getenv("GITHUB_TOKEN")
 headers = (
     {
         "Authorization": f"Bearer {github_token}",
-        "Accept": "application/vnd.github.v3+json",
+        "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
     }
     if github_token
     else {}
 )
-list_running_workflows = bool(os.getenv("LIST_RUNNING_WORKFLOWS"))
+list_running_workflows = os.getenv("LIST_RUNNING_WORKFLOWS", "False").lower() in (
+    "true",
+    "1",
+    "yes",
+)
 
 
 def get_last_successful_workflow_for_commit(
-    commit_sha: str,
+    commit_sha: str, workflow_name: str | None = None,
 ) -> dict[str, Any] | None:
     """
     Use GitHub API to retrieve the last successful workflow run for a specific commit.
 
     Args:
         commit_sha (str): full sha1 to search workflow runs for.
+        workflow_name (str, optional): name of the workflow to filter by.
 
     Returns:
         dict | None: workflow run found for this specific commit.
@@ -59,40 +64,19 @@ def get_last_successful_workflow_for_commit(
     if not workflow_runs:
         return None
 
+    # Filter by workflow name if specified
+    if workflow_name:
+        workflow_runs = [
+            run for run in workflow_runs
+            if run.get("name") == workflow_name
+        ]
+
+        if not workflow_runs:
+            logger.info(f"No workflow runs found for workflow '{workflow_name}'")
+            return None
+
     # Sort workflow runs by ID or created_at date (latest first)
     return sorted(workflow_runs, key=lambda x: x["id"], reverse=True)[0]
-
-
-def get_jobs_for_workflow_run(run_id: str) -> list | None:
-    """
-    Use GitHub API to retrieve jobs for a specific workflow run.
-
-    Args:
-        run_id (str): workflow run ID to retrieve jobs for.
-
-    Returns:
-        list | None: list of jobs found for this specific workflow run.
-            (ex.: https://docs.github.com/en/rest/actions/workflow-jobs)
-    """
-    url = f"{api_url}/repos/{repository}/actions/runs/{run_id}/jobs?per_page=100"
-
-    req = urllib.request.Request(url, headers=headers)
-    jobs = None
-
-    with urllib.request.urlopen(req) as response:
-        # Check the status code
-        if response.status != HTTPStatus.OK:
-            raise ValueError(
-                url, response.status, response.reason, response.headers, None
-            )
-        data = json.load(response)
-        jobs = data.get("jobs", [])
-
-    if not jobs:
-        logger.info("No jobs found for this workflow run.")
-        return None
-
-    return jobs
 
 
 def download_artifact(run_id: str, artifact_name: str) -> str:
@@ -131,6 +115,12 @@ def download_artifact(run_id: str, artifact_name: str) -> str:
             f"Artifact '{artifact_name}' not found in workflow run {run_id}"
         )
 
+    # Check if artifact has expired
+    if target_artifact.get("expired", False):
+        raise ValueError(f"Artifact '{artifact_name}' has expired and is no longer available for download")
+
+    logger.info(f"Found artifact '{artifact_name}' with ID: {target_artifact['id']}")
+
     # Download the artifact
     download_url = (
         f"{api_url}/repos/{repository}/actions/artifacts/{target_artifact['id']}/zip"
@@ -160,7 +150,7 @@ def download_artifact(run_id: str, artifact_name: str) -> str:
         raise ValueError(f"No content found in artifact '{artifact_name}'")
 
 
-def main(commit_sha1: str, artifact_name: str) -> None:
+def main(commit_sha1: str, artifact_name: str, workflow_name: str | None = None) -> None:
     """Entrypoint for script that prints content of artifact
     generated in a workflow run that has previously run for commit with
     given sha1.
@@ -172,6 +162,7 @@ def main(commit_sha1: str, artifact_name: str) -> None:
         commit_sha1 (str): sha1 of commit for which a workflow run has run before.
         artifact_name (str, optional): name of artifact to download from the given workflow run.
             Defaults to "version".
+        workflow_name (str, optional): name of the workflow to filter by.
 
     Returns:
         Returns none, outputs content to stdout.
@@ -179,11 +170,13 @@ def main(commit_sha1: str, artifact_name: str) -> None:
     logging.basicConfig(level=logging.INFO)
 
     try:
-        last_workflow_run = get_last_successful_workflow_for_commit(commit_sha1)
+        last_workflow_run = get_last_successful_workflow_for_commit(commit_sha1, workflow_name)
         if last_workflow_run:
             logger.info(
                 f"Last successful workflow run has ID: {last_workflow_run['id']}"
             )
+            if workflow_name:
+                logger.info(f"Found workflow run for workflow '{workflow_name}'")
 
             # Download artifact directly from the workflow run
             try:
@@ -195,7 +188,8 @@ def main(commit_sha1: str, artifact_name: str) -> None:
                 print(version)  # print result to stdout
                 return
 
-    except urllib.error.HTTPError:
+    except urllib.error.HTTPError as e:
+        print(f"HTTP error occurred: {e.code} - {e.reason}")
         pass
 
     logger.error(
@@ -219,6 +213,11 @@ if __name__ == "__main__":
     parser.add_argument(
         "--artifact-name", help="The name of the version artifact.", default="version"
     )
+    parser.add_argument(
+        "--workflow-name",
+        help="The name of the workflow to filter by. If not specified, uses the most recent workflow run.",
+        default=None
+    )
     args = parser.parse_args()
 
-    main(args.commit_sha1, args.artifact_name)
+    main(args.commit_sha1, args.artifact_name, args.workflow_name)

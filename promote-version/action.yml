@@ -19,6 +19,10 @@ inputs:
     description: 'Name of the version artifact'
     required: false
     default: 'version'
+  workflow-name:
+    description: 'Name of the workflow to retrieve the version artifact from. Defaults to the current workflow.'
+    required: false
+    default: ${{ github.workflow }}
 outputs:
   version:
     description: 'Retrieved semantic version'
@@ -49,7 +53,7 @@ runs:
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
       run: |
-        SEMVER_VERSION=$(uv run python -m github_semver.commit_version --artifact-name "${{ inputs.artifact-name }}")
+        SEMVER_VERSION=$(uv run python -m github_semver.commit_version --artifact-name "${{ inputs.artifact-name }}" --workflow-name "${{ inputs.workflow-name }}")
         echo "$SEMVER_VERSION" > version
         echo "version=$SEMVER_VERSION" >> $GITHUB_OUTPUT
         echo "SEMVER_VERSION=$SEMVER_VERSION" >> $GITHUB_ENV

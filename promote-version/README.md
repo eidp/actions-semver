@@ -6,11 +6,12 @@ The GitHub token needs to have `actions: read` permission to be able to access t
 
 ## 🔧 Inputs
 
-|      Name      |         Description        |Required|       Default       |
-|----------------|----------------------------|--------|---------------------|
-|`python-version`|    Python version to use   |   No   |        `3.13`       |
-| `github-token` | GitHub token for API access|   No   |`${{ github.token }}`|
-| `artifact-name`|Name of the version artifact|   No   |      `version`      |
+|      Name      |                                         Description                                         |Required|         Default        |
+|----------------|---------------------------------------------------------------------------------------------|--------|------------------------|
+|`python-version`|                                    Python version to use                                    |   No   |         `3.13`         |
+| `github-token` |                                 GitHub token for API access                                 |   No   |  `${{ github.token }}` |
+| `artifact-name`|                                 Name of the version artifact                                |   No   |        `version`       |
+| `workflow-name`|Name of the workflow to retrieve the version artifact from. Defaults to the current workflow.|   No   |`${{ github.workflow }}`|
 
 ## 📤 Outputs
 
