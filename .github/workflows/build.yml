@@ -132,7 +132,7 @@ jobs:
       id: promote
       uses: ./promote-version
       env:
-        LIST_RUNNING_WORKFLOWS: "true"  # To be able to retrieve artifacts from the current workflow run
+        LIST_ALL_WORKFLOWS: "true"  # To be able to retrieve artifacts from the current workflow run
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         github-token: ${{ secrets.GITHUB_TOKEN }}

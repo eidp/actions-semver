@@ -24,7 +24,7 @@ headers = (
     if github_token
     else {}
 )
-list_running_workflows = os.getenv("LIST_RUNNING_WORKFLOWS", "False").lower() in (
+list_all_workflows = os.getenv("LIST_ALL_WORKFLOWS", "False").lower() in (
     "true",
     "1",
     "yes",
@@ -48,9 +48,9 @@ def get_last_successful_workflow_for_commit(
     """
     print(f"Searching for workflow runs for commit: {commit_sha}")
     url = f"{api_url}/repos/{repository}/actions/runs?head_sha={commit_sha}&status=success"
-    if list_running_workflows:
+    if list_all_workflows:
         print("Checking for in_progress workflows")
-        url = f"{api_url}/repos/{repository}/actions/runs?head_sha={commit_sha}&status=in_progress"
+        url = f"{api_url}/repos/{repository}/actions/runs?head_sha={commit_sha}"
 
     req = urllib.request.Request(url, headers=headers)
     workflow_runs = None
@@ -66,7 +66,7 @@ def get_last_successful_workflow_for_commit(
 
     if not workflow_runs:
         logger.info(
-            f"No {'in progress' if list_running_workflows else 'successful'} workflow runs found for workflow '{workflow_name}'"
+            f"No {'in progress' if list_all_workflows else 'successful'} workflow runs found for workflow '{workflow_name}'"
         )
         return None
 
@@ -78,7 +78,7 @@ def get_last_successful_workflow_for_commit(
 
         if not workflow_runs:
             logger.info(
-                f"No {'in progress' if list_running_workflows else 'successful'} workflow runs found for workflow '{workflow_name}'"
+                f"No {'in progress' if list_all_workflows else 'successful'} workflow runs found for workflow '{workflow_name}'"
             )
             return None
 
