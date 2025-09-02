@@ -1,19 +1,23 @@
-import json
+import io
 import os
+import zipfile
 from unittest.mock import MagicMock, patch
 
+import pytest
 import requests
 
 from github_semver.commit_version import (
-    get_last_successful_workflow_for_commit,
-    download_artifact,
     _get_artifact_metadata,
-    _extract_zip_content,
+    download_artifact,
+    get_last_successful_workflow_for_commit,
 )
 
 # Test constants
 EXPECTED_LATEST_WORKFLOW_ID = 124
 EXPECTED_JOB_COUNT = 2
+EXPECTED_ARTIFACT_ID = 123
+EXPECTED_CALL_COUNT_WITH_REDIRECT = 3
+EXPECTED_CALL_COUNT_WITHOUT_REDIRECT = 2
 
 
 @patch.dict(
@@ -61,7 +65,7 @@ def test_get_artifact_metadata(mock_get):
 
     artifact_data = {
         "artifacts": [
-            {"id": 123, "name": "version", "expired": False},
+            {"id": EXPECTED_ARTIFACT_ID, "name": "version", "expired": False},
             {"id": 124, "name": "other-artifact", "expired": False},
         ]
     }
@@ -71,7 +75,7 @@ def test_get_artifact_metadata(mock_get):
     result = _get_artifact_metadata("456", "version")
 
     assert result is not None
-    assert result["id"] == 123
+    assert result["id"] == EXPECTED_ARTIFACT_ID
     assert result["name"] == "version"
 
 
@@ -87,23 +91,23 @@ def test_download_artifact_with_redirect(mock_get):
     metadata_response.status_code = 200
     metadata_response.raise_for_status.return_value = None
     metadata_response.json.return_value = {
-        "artifacts": [{"id": 123, "name": "version", "expired": False}]
+        "artifacts": [{"id": EXPECTED_ARTIFACT_ID, "name": "version", "expired": False}]
     }
 
     # Mock second response (initial download request with redirect)
     redirect_response = MagicMock()
     redirect_response.status_code = 302
-    redirect_response.headers = {"Location": "https://external-storage.com/artifact.zip"}
+    redirect_response.headers = {
+        "Location": "https://external-storage.com/artifact.zip"
+    }
 
     # Mock third response (actual artifact download)
     download_response = MagicMock()
     download_response.status_code = 200
     download_response.raise_for_status.return_value = None
     # Mock zip content containing "1.2.3"
-    import zipfile
-    import io
     zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+    with zipfile.ZipFile(zip_buffer, "w") as zip_file:
         zip_file.writestr("version", "1.2.3")
     download_response.content = zip_buffer.getvalue()
 
@@ -113,7 +117,7 @@ def test_download_artifact_with_redirect(mock_get):
     result = download_artifact("456", "version")
 
     assert result == "1.2.3"
-    assert mock_get.call_count == 3
+    assert mock_get.call_count == EXPECTED_CALL_COUNT_WITH_REDIRECT
 
 
 @patch.dict(
@@ -128,7 +132,7 @@ def test_download_artifact_without_redirect(mock_get):
     metadata_response.status_code = 200
     metadata_response.raise_for_status.return_value = None
     metadata_response.json.return_value = {
-        "artifacts": [{"id": 123, "name": "version", "expired": False}]
+        "artifacts": [{"id": EXPECTED_ARTIFACT_ID, "name": "version", "expired": False}]
     }
 
     # Mock second response (direct download without redirect)
@@ -136,10 +140,8 @@ def test_download_artifact_without_redirect(mock_get):
     download_response.status_code = 200
     download_response.raise_for_status.return_value = None
     # Mock zip content containing "2.0.0"
-    import zipfile
-    import io
     zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+    with zipfile.ZipFile(zip_buffer, "w") as zip_file:
         zip_file.writestr("version", "2.0.0")
     download_response.content = zip_buffer.getvalue()
 
@@ -149,7 +151,7 @@ def test_download_artifact_without_redirect(mock_get):
     result = download_artifact("456", "version")
 
     assert result == "2.0.0"
-    assert mock_get.call_count == 2
+    assert mock_get.call_count == EXPECTED_CALL_COUNT_WITHOUT_REDIRECT
 
 
 @patch.dict(
@@ -164,15 +166,12 @@ def test_download_artifact_expired_error(mock_get):
     mock_response.status_code = 200
     mock_response.raise_for_status.return_value = None
     mock_response.json.return_value = {
-        "artifacts": [{"id": 123, "name": "version", "expired": True}]
+        "artifacts": [{"id": EXPECTED_ARTIFACT_ID, "name": "version", "expired": True}]
     }
     mock_get.return_value = mock_response
 
-    try:
+    with pytest.raises(ValueError, match="expired"):
         download_artifact("456", "version")
-        assert False, "Expected ValueError for expired artifact"
-    except ValueError as e:
-        assert "expired" in str(e)
 
 
 @patch.dict(
@@ -187,7 +186,7 @@ def test_download_artifact_403_error(mock_get):
     metadata_response.status_code = 200
     metadata_response.raise_for_status.return_value = None
     metadata_response.json.return_value = {
-        "artifacts": [{"id": 123, "name": "version", "expired": False}]
+        "artifacts": [{"id": EXPECTED_ARTIFACT_ID, "name": "version", "expired": False}]
     }
 
     # Mock second response (403 error)
@@ -199,9 +198,5 @@ def test_download_artifact_403_error(mock_get):
 
     mock_get.side_effect = [metadata_response, error_response]
 
-    try:
+    with pytest.raises(ValueError, match="403 Forbidden.*actions:read"):
         download_artifact("456", "version")
-        assert False, "Expected ValueError for 403 error"
-    except ValueError as e:
-        assert "403 Forbidden" in str(e)
-        assert "actions:read" in str(e)
