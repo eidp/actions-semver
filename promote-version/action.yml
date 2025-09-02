@@ -53,7 +53,16 @@ runs:
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
       run: |
-        SEMVER_VERSION=$(uv run python -m github_semver.commit_version --artifact-name "${{ inputs.artifact-name }}" --workflow-name "${{ inputs.workflow-name }}")
+        # Determine the correct commit SHA based on the event type
+        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          COMMIT_SHA="${{ github.event.pull_request.head.sha }}"
+          echo "Using PR head SHA: $COMMIT_SHA"
+        else
+          COMMIT_SHA="${GITHUB_SHA}"
+          echo "Using GITHUB_SHA: $COMMIT_SHA"
+        fi
+
+        SEMVER_VERSION=$(uv run python -m github_semver.commit_version --commit-sha1 "$COMMIT_SHA" --artifact-name "${{ inputs.artifact-name }}" --workflow-name "${{ inputs.workflow-name }}")
         echo "$SEMVER_VERSION" > version
         echo "version=$SEMVER_VERSION" >> $GITHUB_OUTPUT
         echo "SEMVER_VERSION=$SEMVER_VERSION" >> $GITHUB_ENV
