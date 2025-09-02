@@ -1,7 +1,9 @@
+import json
 import logging
 import os
 import re
 import subprocess
+from pathlib import Path
 
 from .bumps import append_rc, bump_build, bump_patch
 
@@ -24,28 +26,47 @@ def _retrieve_latest_tag_from_git() -> str | None:
     return None
 
 
+def _get_pr_head_sha() -> str:
+    """Extract the head SHA from pull request event data."""
+    github_event_path = os.environ.get("GITHUB_EVENT_PATH")
+    if github_event_path and Path(github_event_path).exists():
+        try:
+            with Path(github_event_path).open() as f:
+                event_data = json.load(f)
+            return event_data["pull_request"]["head"]["sha"][:7]
+        except (KeyError, FileNotFoundError, json.JSONDecodeError):
+            pass
+    # Fallback to GITHUB_SHA
+    return os.environ["GITHUB_SHA"][:7]
+
+
+def _extract_branch_and_sha() -> tuple[str, str]:
+    """Extract branch name and SHA based on GitHub context."""
+    github_ref = os.environ["GITHUB_REF"]
+    github_ref_name = os.environ.get("GITHUB_REF_NAME", "")
+    github_head_ref = os.environ.get("GITHUB_HEAD_REF", "")
+
+    if github_head_ref:
+        # This is a pull request - use the head SHA, not the merge SHA
+        branch = github_head_ref
+        sha1 = _get_pr_head_sha()
+    elif github_ref.startswith("refs/heads/"):
+        # This is a push to a branch - use GITHUB_SHA normally
+        branch = github_ref_name
+        sha1 = os.environ["GITHUB_SHA"][:7]
+    else:
+        # Fallback to ref name
+        branch = github_ref_name
+        sha1 = os.environ["GITHUB_SHA"][:7]
+
+    return branch, sha1
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
 
     try:
-        # GitHub Actions environment variables
-        sha1 = os.environ["GITHUB_SHA"][:7]  # Short SHA equivalent
-
-        # Determine branch name from different GitHub contexts
-        github_ref = os.environ["GITHUB_REF"]
-        github_ref_name = os.environ.get("GITHUB_REF_NAME", "")
-        github_head_ref = os.environ.get("GITHUB_HEAD_REF", "")  # For pull requests
-
-        # Extract branch name based on context
-        if github_head_ref:
-            # This is a pull request
-            branch = github_head_ref
-        elif github_ref.startswith("refs/heads/"):
-            # This is a push to a branch
-            branch = github_ref_name
-        else:
-            # Fallback to ref name
-            branch = github_ref_name
+        branch, sha1 = _extract_branch_and_sha()
 
         # Default branch name, defaulting to 'main' if not set
         default_branch = os.environ.get("REPO_DEFAULT_BRANCH", "main")

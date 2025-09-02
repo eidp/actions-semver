@@ -236,6 +236,7 @@ def main(
 
 if __name__ == "__main__":
     sha1 = os.getenv("GITHUB_SHA")
+    workflow = os.getenv("GITHUB_WORKFLOW")
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -252,7 +253,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--workflow-name",
         help="The name of the workflow to filter by. If not specified, uses the most recent workflow run.",
-        default=None,
+        default=workflow,
     )
     args = parser.parse_args()
 
