@@ -1,0 +1,55 @@
+name: 'Generate Version'
+description: >
+  The generate-version action executes the [`run_semver.py`](../github_semver/run_semver.py) script.
+  The generated version is then stored as `SEMVER_VERSION` environment variable, set as output of this action and finally stored as an artifact.
+
+inputs:
+  python-version:
+    description: 'Python version to use'
+    required: false
+    default: '3.13'
+  build-rc-semver:
+    description: 'Whether to build RC semver (adds rc suffix)'
+    required: false
+    default: 'true'
+outputs:
+  version:
+    description: 'Generated semantic version'
+    value: ${{ steps.generate.outputs.version }}
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install UV
+      uses: astral-sh/setup-uv@v4
+      with:
+        enable-cache: true
+
+    - name: Install dependencies
+      shell: bash
+      working-directory: ${{ github.action_path }}/../..
+      run: |
+        uv sync --frozen
+
+    - name: Generate version
+      id: generate
+      shell: bash
+      working-directory: ${{ github.action_path }}/../..
+      env:
+        BUILD_RC_SEMVER: ${{ inputs.build-rc-semver }}
+        REPO_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      run: |
+        CHART_VERSION=$(uv run python -m github_semver.run_semver)
+        echo "$CHART_VERSION" > version
+        echo "version=$CHART_VERSION" >> $GITHUB_OUTPUT
+        echo "CHART_VERSION=$CHART_VERSION" >> $GITHUB_ENV
+
+    - name: Upload version artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: version
+        path: version

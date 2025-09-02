@@ -1,0 +1,55 @@
+name: 'Promote Version'
+description: >
+  The promote-version component executes the [`commit_version`](../github_semver/commit_version.py) script which 
+  downloads the version artifact from the last successful workflow run for the current commit.
+  The corresponding version is stored as `SEMVER_VERSION` environment variable and set as output of this action.
+  This pipeline is supposed to be run for releases only.
+  
+  The GitHub token needs to have `actions: read` permission to be able to access the workflow runs.
+inputs:
+  python-version:
+    description: 'Python version to use'
+    required: false
+    default: '3.13'
+  github-token:
+    description: 'GitHub token for API access'
+    required: false
+    default: ${{ github.token }}
+  artifact-name:
+    description: 'Name of the version artifact'
+    required: false
+    default: 'version'
+outputs:
+  version:
+    description: 'Retrieved semantic version'
+    value: ${{ steps.promote.outputs.version }}
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install UV
+      uses: astral-sh/setup-uv@v4
+      with:
+        enable-cache: true
+
+    - name: Install dependencies
+      shell: bash
+      working-directory: ${{ github.action_path }}/../..
+      run: |
+        uv sync --frozen
+
+    - name: Promote version
+      id: promote
+      shell: bash
+      working-directory: ${{ github.action_path }}/../..
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: |
+        SEMVER_VERSION=$(uv run python -m github_semver.commit_version --artifact-name "${{ inputs.artifact-name }}")
+        echo "$SEMVER_VERSION" > version
+        echo "version=$SEMVER_VERSION" >> $GITHUB_OUTPUT
+        echo "SEMVER_VERSION=$SEMVER_VERSION" >> $GITHUB_ENV

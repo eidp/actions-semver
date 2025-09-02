@@ -1,0 +1,156 @@
+name: Build Pipeline
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+    branches:
+    - main
+
+env:
+  PYTHON_VERSION: "3.13"
+
+jobs:
+  lint-and-test:
+    name: Lint and Test
+    runs-on: kubernetes-runner
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install UV
+      uses: astral-sh/setup-uv@v4
+      with:
+        enable-cache: true
+
+    - name: Install dependencies
+      run: uv sync --frozen
+
+    - name: Run ruff linting
+      run: |
+        echo "Running ruff check..."
+        uv run ruff check
+        echo "Running ruff format check..."
+        uv run ruff format --check
+
+    - name: Run unit tests
+      run: |
+        echo "Running pytest..."
+        uv run pytest --verbose
+
+  test-generate-version-action:
+    name: Test Generate Version Action
+    runs-on: kubernetes-runner
+    outputs:
+      version: ${{ steps.generate.outputs.version }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+
+    - name: Run generate-version action
+      id: generate
+      uses: ./generate-version
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        build-rc-semver: 'true'
+
+    - name: Verify generate-version output
+      run: |
+        echo "Generated version: ${{ steps.generate.outputs.version }}"
+        
+        # Verify version is not empty
+        if [ -z "${{ steps.generate.outputs.version }}" ]; then
+          echo "❌ ERROR: Generated version is empty"
+          exit 1
+        fi
+
+        # Verify version file exists
+        if [ ! -f "version" ]; then
+          echo "❌ ERROR: Version file was not created"
+          exit 1
+        fi
+
+        # Verify version file content matches output
+        FILE_VERSION=$(cat version)
+        if [ "$FILE_VERSION" != "${{ steps.generate.outputs.version }}" ]; then
+          echo "❌ ERROR: Version file content ($FILE_VERSION) doesn't match output (${{ steps.generate.outputs.version }})"
+          exit 1
+        fi
+
+        # Verify version follows semantic versioning pattern
+        if ! echo "${{ steps.generate.outputs.version }}" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+'; then
+          echo "❌ ERROR: Version doesn't follow semantic versioning pattern"
+          exit 1
+        fi
+
+        echo "✅ Generate version action verified successfully"
+        echo "✅ Version: ${{ steps.generate.outputs.version }}"
+
+    - name: Download version artifact
+      uses: actions/download-artifact@v5
+      with:
+        name: version
+        path: ./artifacts
+
+    - name: Verify version artifact
+      run: |
+        if [ ! -f "./artifacts/version" ]; then
+          echo "❌ ERROR: Version artifact was not uploaded"
+          exit 1
+        fi
+
+        ARTIFACT_VERSION=$(cat ./artifacts/version)
+        if [ "$ARTIFACT_VERSION" != "${{ steps.generate.outputs.version }}" ]; then
+          echo "❌ ERROR: Artifact version ($ARTIFACT_VERSION) doesn't match generated version (${{ steps.generate.outputs.version }})"
+          exit 1
+        fi
+
+        echo "✅ Version artifact verified successfully"
+
+  test-promote-version-action:
+    name: Test Promote Version Action
+    needs: test-generate-version-action
+    runs-on: kubernetes-runner
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Run promote-version action
+      id: promote
+      uses: ./promote-version
+      env:
+        LIST_RUNNING_WORKFLOWS: "true"  # To be able to retrieve artifacts from the current workflow run
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Verify promote-version output
+      run: |
+        echo "Promoted version: ${{ steps.promote.outputs.version }}"
+
+        # Verify version is not empty
+        if [ -z "${{ steps.promote.outputs.version }}" ]; then
+          echo "❌ ERROR: Promoted version is empty"
+          exit 1
+        fi
+
+        # Verify SEMVER_VERSION env variable is set
+        if [ -z "${SEMVER_VERSION}" ]; then
+          echo "❌ ERROR: SEMVER_VERSION environment variable is not set"
+          exit 1
+        fi
+
+        if [ "$SEMVER_VERSION" != "${{ steps.promote.outputs.version }}" ]; then
+            echo "❌ ERROR: SEMVER_VERSION environment variable ($SEMVER_VERSION) doesn't match output (${{ steps.promote.outputs.version }})"
+            exit 1
+        fi
