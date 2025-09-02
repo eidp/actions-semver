@@ -13,7 +13,6 @@ env:
 
 jobs:
   lint-and-test:
-    name: Lint and Test
     runs-on: kubernetes-runner
     steps:
     - name: Checkout code
@@ -47,7 +46,6 @@ jobs:
         uv run pytest --verbose
 
   test-generate-version-action:
-    name: Test Generate Version Action
     runs-on: kubernetes-runner
     outputs:
       version: ${{ steps.generate.outputs.version }}
@@ -118,7 +116,6 @@ jobs:
         echo "✅ Version artifact verified successfully"
 
   test-fetch-commit-version-action:
-    name: Test Commit Version Action
     needs: test-generate-version-action
     runs-on: kubernetes-runner
     permissions:
@@ -128,7 +125,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v5
 
-    - name: Run commit-version action
+    - name: Run fetch-commit-version action
       id: fetch-commit-version
       uses: ./fetch-commit-version
       env:
@@ -154,6 +151,19 @@ jobs:
         fi
 
         if [ "$COMMIT_VERSION" != "${{ steps.fetch-commit-version.outputs.version }}" ]; then
-            echo "❌ ERROR: COMMIT_VERSION environment variable ($COMMIT_VERSION) doesn't match output (${{ steps.commit.outputs.version }})"
+            echo "❌ ERROR: COMMIT_VERSION environment variable ($COMMIT_VERSION) doesn't match output (${{ steps.fetch-commit-version.outputs.version }})"
             exit 1
         fi
+
+  check-workflow-status:
+    runs-on: kubernetes-runner
+    permissions:
+      contents: read
+      actions: read
+    steps:
+    - name: Check Workflow Status
+      id: check-workflow-status
+      uses: eidp/actions-common/check-workflow-status@v0.4.0
+      with:
+        jobs: 'lint-and-test,test-generate-version-action,test-fetch-commit-version-action'
+        github-token: ${{ secrets.GITHUB_TOKEN }}
