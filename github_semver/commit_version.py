@@ -47,10 +47,10 @@ def get_last_successful_workflow_for_commit(
         dict | None: workflow run found for this specific commit.
             (ex.: https://docs.github.com/en/rest/actions/workflow-runs)
     """
-    print(f"Searching for workflow runs for commit: {commit_sha}")
+    logger.info(f"Searching for workflow runs for commit: {commit_sha}")
     url = f"{api_url}/repos/{repository}/actions/runs?head_sha={commit_sha}&status=success"
     if list_all_workflows:
-        print("Checking for in_progress workflows")
+        logger.info("Checking for in_progress workflows")
         url = f"{api_url}/repos/{repository}/actions/runs?head_sha={commit_sha}"
 
     response = requests.get(url, headers=headers, timeout=30)
@@ -59,7 +59,7 @@ def get_last_successful_workflow_for_commit(
     data = response.json()
     workflow_runs = data.get("workflow_runs", [])
 
-    print(f"Found {len(workflow_runs)} workflow runs for commit {commit_sha}")
+    logger.info(f"Found {len(workflow_runs)} workflow runs for commit {commit_sha}")
 
     if not workflow_runs:
         logger.info(
