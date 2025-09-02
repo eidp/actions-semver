@@ -13,7 +13,9 @@ EXPECTED_JOB_COUNT = 2
 
 
 @patch.dict(
-    os.environ, {"GITHUB_REPOSITORY": "owner/repo", "GITHUB_TOKEN": "test_token"}, clear=True
+    os.environ,
+    {"GITHUB_REPOSITORY": "owner/repo", "GITHUB_TOKEN": "test_token"},
+    clear=True,
 )
 @patch("github_semver.commit_version.urllib.request.urlopen")
 def test_get_last_successful_workflow_for_commit(mock_urlopen):
@@ -42,7 +44,9 @@ def test_get_last_successful_workflow_for_commit(mock_urlopen):
 
 
 @patch.dict(
-    os.environ, {"GITHUB_REPOSITORY": "owner/repo", "GITHUB_TOKEN": "test_token"}, clear=True
+    os.environ,
+    {"GITHUB_REPOSITORY": "owner/repo", "GITHUB_TOKEN": "test_token"},
+    clear=True,
 )
 @patch("github_semver.commit_version.urllib.request.urlopen")
 def test_get_jobs_for_workflow_run(mock_urlopen):
