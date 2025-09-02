@@ -203,7 +203,6 @@ def main(
 
     except urllib.error.HTTPError as e:
         print(f"HTTP error occurred: {e.code} - {e.reason}")
-        pass
 
     logger.error(
         "\033[1;31m Unable to retrieve finished workflow run for this commit, wait for a previous build to finish before tagging. Exiting.\033[0m"
