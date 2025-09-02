@@ -23,6 +23,7 @@ def test_when_no_environment_variables_then_throw_error():
         "REPO_DEFAULT_BRANCH": "main",
         "GITHUB_RUN_NUMBER": "1",
     },
+    clear=True,
 )
 @mock.patch.object(subprocess, "check_output")
 def test_when_environment_variables_are_set_build_version_is_bumped(
@@ -44,6 +45,7 @@ def test_when_environment_variables_are_set_build_version_is_bumped(
         "REPO_DEFAULT_BRANCH": "main",
         "GITHUB_RUN_NUMBER": "1",
     },
+    clear=True,
 )
 @mock.patch.object(subprocess, "check_output")
 def test_when_no_tag_is_found_default_to_first_patch(mock_check_output, capsys):
@@ -65,6 +67,7 @@ def test_when_no_tag_is_found_default_to_first_patch(mock_check_output, capsys):
         "REPO_DEFAULT_BRANCH": "main",
         "GITHUB_RUN_NUMBER": "1",
     },
+    clear=True,
 )
 @mock.patch.object(subprocess, "check_output")
 def test_when_run_on_default_branch_patch_bump_based_on_last_tag(
@@ -85,6 +88,7 @@ def test_when_run_on_default_branch_patch_bump_based_on_last_tag(
         "REPO_DEFAULT_BRANCH": "main",
         "GITHUB_RUN_NUMBER": "1",
     },
+    clear=True,
 )
 @mock.patch.object(subprocess, "check_output")
 def test_when_run_on_default_branch_without_tag_bump_to_0_0_2_rc(
@@ -104,6 +108,7 @@ def test_when_run_on_default_branch_without_tag_bump_to_0_0_2_rc(
         "REPO_DEFAULT_BRANCH": "main",
         "GITHUB_RUN_NUMBER": "42",
     },
+    clear=True,
 )
 @mock.patch.object(subprocess, "check_output")
 def test_when_run_on_pull_request_patch_bump_build_version(mock_check_output, capsys):
@@ -123,6 +128,7 @@ def test_when_run_on_pull_request_patch_bump_build_version(mock_check_output, ca
         "REPO_DEFAULT_BRANCH": "main",
         "GITHUB_RUN_NUMBER": "42",
     },
+    clear=True,
 )
 @mock.patch.object(subprocess, "check_output")
 def test_when_run_on_pull_request_without_tag_bump_to_first_patch(
@@ -145,6 +151,7 @@ def test_when_run_on_pull_request_without_tag_bump_to_first_patch(
         "GITHUB_RUN_NUMBER": "1",
         "BUILD_RC_SEMVER": "False",  # Disable RC building
     },
+    clear=True,
 )
 @mock.patch.object(subprocess, "check_output")
 def test_when_run_on_default_branch_with_rc_disabled_no_rc_suffix(
