@@ -64,6 +64,9 @@ def get_last_successful_workflow_for_commit(
         data = json.load(response)
         workflow_runs = data.get("workflow_runs", [])
 
+        print(f"Found {len(workflow_runs)} workflow runs for commit {commit_sha}")
+        print(workflow_runs)
+
     if not workflow_runs:
         logger.info(
             f"No {'in progress' if list_all_workflows else 'successful'} workflow runs found for workflow '{workflow_name}'"
