@@ -31,14 +31,14 @@ runs:
 
     - name: Install dependencies
       shell: bash
-      working-directory: ${{ github.action_path }}/../..
+      working-directory: ${{ github.action_path }}/..
       run: |
         uv sync --frozen
 
     - name: Generate version
       id: generate
       shell: bash
-      working-directory: ${{ github.action_path }}/../..
+      working-directory: ${{ github.action_path }}/..
       env:
         BUILD_RC_SEMVER: ${{ inputs.build-rc-semver }}
         REPO_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}

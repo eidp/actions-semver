@@ -38,14 +38,14 @@ runs:
 
     - name: Install dependencies
       shell: bash
-      working-directory: ${{ github.action_path }}/../..
+      working-directory: ${{ github.action_path }}/..
       run: |
         uv sync --frozen
 
     - name: Promote version
       id: promote
       shell: bash
-      working-directory: ${{ github.action_path }}/../..
+      working-directory: ${{ github.action_path }}/..
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
       run: |
