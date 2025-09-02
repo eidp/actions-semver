@@ -1,7 +1,7 @@
 <!-- NOTE: This file's contents are automatically generated. Do not edit manually. -->
-# Promote Version (Action)
+# Fetch commit Version (Action)
 
-The promote-version component executes the [`commit_version`](../github_semver/commit_version.py) script which  downloads the version artifact from the last successful workflow run for the current commit. The corresponding version is stored as `SEMVER_VERSION` environment variable and set as output of this action. This pipeline is supposed to be run for releases only.
+The fetch-commit-version component executes the [`commit_version`](../github_semver/commit_version.py) script which  downloads the version artifact from the last successful workflow run for the current commit. The corresponding version is stored as `COMMIT_VERSION` environment variable and set as output of this action. This pipeline is supposed to be run for releases only.
 The GitHub token needs to have `actions: read` permission to be able to access the workflow runs.
 
 ## 🔧 Inputs
@@ -15,15 +15,15 @@ The GitHub token needs to have `actions: read` permission to be able to access t
 
 ## 📤 Outputs
 
-|   Name  |        Description       |
-|---------|--------------------------|
-|`version`|Retrieved semantic version|
+|   Name  |             Description             |
+|---------|-------------------------------------|
+|`version`|Retrieved semantic version for commit|
 
 ## 🚀 Usage
 
 ```yaml
-- name: Promote Version
-  uses: eidp/actions-semver/promote-version@v0
+- name: Fetch commit Version
+  uses: eidp/actions-semver/fetch-commit-version@v0
   with:
     # your inputs here
 ```

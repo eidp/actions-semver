@@ -1,16 +1,17 @@
 import argparse
 import io
-import json
 import logging
 import os
 import sys
-import urllib.error
-import urllib.request
 import zipfile
-from http import HTTPStatus
 from typing import Any
 
+import requests
+
 logger = logging.getLogger(__name__)
+
+# Constants
+HTTP_FORBIDDEN = 403
 
 api_url = os.getenv("GITHUB_API_URL", "https://api.github.com")
 repository = os.getenv("GITHUB_REPOSITORY")  # format: owner/repo
@@ -52,20 +53,13 @@ def get_last_successful_workflow_for_commit(
         print("Checking for in_progress workflows")
         url = f"{api_url}/repos/{repository}/actions/runs?head_sha={commit_sha}"
 
-    req = urllib.request.Request(url, headers=headers)
-    workflow_runs = None
+    response = requests.get(url, headers=headers, timeout=30)
+    response.raise_for_status()
 
-    with urllib.request.urlopen(req) as response:
-        # Check the status code
-        if response.status != HTTPStatus.OK:
-            raise ValueError(
-                url, response.status, response.reason, response.headers, None
-            )
-        data = json.load(response)
-        workflow_runs = data.get("workflow_runs", [])
+    data = response.json()
+    workflow_runs = data.get("workflow_runs", [])
 
-        print(f"Found {len(workflow_runs)} workflow runs for commit {commit_sha}")
-        print(workflow_runs)
+    print(f"Found {len(workflow_runs)} workflow runs for commit {commit_sha}")
 
     if not workflow_runs:
         logger.info(
@@ -89,6 +83,43 @@ def get_last_successful_workflow_for_commit(
     return sorted(workflow_runs, key=lambda x: x["id"], reverse=True)[0]
 
 
+def _get_artifact_metadata(run_id: str, artifact_name: str) -> dict[str, Any]:
+    """Get artifact metadata from workflow run."""
+    url = f"{api_url}/repos/{repository}/actions/runs/{run_id}/artifacts"
+    response = requests.get(url, headers=headers, timeout=30)
+    response.raise_for_status()
+
+    data = response.json()
+    artifacts = data.get("artifacts", [])
+
+    # Find the artifact by name
+    for artifact in artifacts:
+        if artifact["name"] == artifact_name:
+            # Check if artifact has expired
+            if artifact.get("expired", False):
+                raise ValueError(
+                    f"Artifact '{artifact_name}' has expired and is no longer available for download"
+                )
+            return artifact
+
+    raise ValueError(f"Artifact '{artifact_name}' not found in workflow run {run_id}")
+
+
+def _extract_zip_content(zip_content: bytes, artifact_name: str) -> str:
+    """Extract content from zip file."""
+    with zipfile.ZipFile(io.BytesIO(zip_content)) as zip_file:
+        # Assume the artifact contains a single file with the version
+        for file_name in zip_file.namelist():
+            if file_name == artifact_name or file_name.endswith(f"/{artifact_name}"):
+                return zip_file.read(file_name).decode("utf-8").rstrip()
+
+        # If exact match not found, try the first file
+        if zip_file.namelist():
+            return zip_file.read(zip_file.namelist()[0]).decode("utf-8").rstrip()
+
+    raise ValueError(f"No content found in artifact '{artifact_name}'")
+
+
 def download_artifact(run_id: str, artifact_name: str) -> str:
     """
     Use GitHub API to retrieve an artifact for a specific workflow run.
@@ -101,65 +132,53 @@ def download_artifact(run_id: str, artifact_name: str) -> str:
         str: content of the downloaded artifact.
             (ex.: https://docs.github.com/en/rest/actions/artifacts)
     """
-    # First, get the list of artifacts for the workflow run
-    url = f"{api_url}/repos/{repository}/actions/runs/{run_id}/artifacts"
-    req = urllib.request.Request(url, headers=headers)
-
-    with urllib.request.urlopen(req) as response:
-        if response.status != HTTPStatus.OK:
-            raise ValueError(
-                url, response.status, response.reason, response.headers, None
-            )
-        data = json.load(response)
-        artifacts = data.get("artifacts", [])
-
-    # Find the artifact by name
-    target_artifact = None
-    for artifact in artifacts:
-        if artifact["name"] == artifact_name:
-            target_artifact = artifact
-            break
-
-    if not target_artifact:
-        raise ValueError(
-            f"Artifact '{artifact_name}' not found in workflow run {run_id}"
+    try:
+        # Get artifact metadata
+        target_artifact = _get_artifact_metadata(run_id, artifact_name)
+        logger.info(
+            f"Found artifact '{artifact_name}' with ID: {target_artifact['id']}"
         )
 
-    # Check if artifact has expired
-    if target_artifact.get("expired", False):
-        raise ValueError(
-            f"Artifact '{artifact_name}' has expired and is no longer available for download"
+        # Download URL
+        download_url = f"{api_url}/repos/{repository}/actions/artifacts/{target_artifact['id']}/zip"
+
+        # First request: Get redirect URL without following it
+        response = requests.get(
+            download_url, headers=headers, allow_redirects=False, timeout=30
         )
 
-    logger.info(f"Found artifact '{artifact_name}' with ID: {target_artifact['id']}")
+        if response.status_code in (301, 302):
+            # Get the redirect URL
+            redirect_url = response.headers.get("Location")
+            if not redirect_url:
+                raise ValueError("Expected redirect but no Location header found")
 
-    # Download the artifact
-    download_url = (
-        f"{api_url}/repos/{repository}/actions/artifacts/{target_artifact['id']}/zip"
-    )
-    req = urllib.request.Request(download_url, headers=headers)
-
-    with urllib.request.urlopen(req) as response:
-        if response.status != HTTPStatus.OK:
-            raise ValueError(
-                download_url, response.status, response.reason, response.headers, None
+            # Second request: Download from redirected URL without auth headers
+            redirect_response = requests.get(
+                redirect_url, headers={"User-Agent": "actions-semver/1.0"}, timeout=30
             )
+            redirect_response.raise_for_status()
+            zip_content = redirect_response.content
+        else:
+            # If no redirect, use the response directly
+            response.raise_for_status()
+            zip_content = response.content
 
-        # GitHub artifacts are zip files, we need to extract the content
-        zip_content = response.read()
-        with zipfile.ZipFile(io.BytesIO(zip_content)) as zip_file:
-            # Assume the artifact contains a single file with the version
-            for file_name in zip_file.namelist():
-                if file_name == artifact_name or file_name.endswith(
-                    f"/{artifact_name}"
-                ):
-                    return zip_file.read(file_name).decode("utf-8").rstrip()
+        # Extract and return content
+        return _extract_zip_content(zip_content, artifact_name)
 
-            # If exact match not found, try the first file
-            if zip_file.namelist():
-                return zip_file.read(zip_file.namelist()[0]).decode("utf-8").rstrip()
-
-        raise ValueError(f"No content found in artifact '{artifact_name}'")
+    except requests.exceptions.HTTPError as e:
+        if e.response and e.response.status_code == HTTP_FORBIDDEN:
+            error_msg = (
+                f"403 Forbidden when downloading artifact '{artifact_name}'. "
+                f"This could be due to: "
+                f"1) Insufficient permissions (ensure GITHUB_TOKEN has 'actions:read' scope), "
+                f"2) Artifact has expired, "
+                f"3) Artifact is from a different repository or private repo without access. "
+                f"Original error: {e}"
+            )
+            raise ValueError(error_msg) from e
+        raise
 
 
 def main(
@@ -197,15 +216,17 @@ def main(
             # Download artifact directly from the workflow run
             try:
                 version = download_artifact(last_workflow_run["id"], artifact_name)
-            except (urllib.error.HTTPError, urllib.error.URLError, ValueError) as e:
+            except (requests.exceptions.RequestException, ValueError) as e:
                 logger.warning(f"Could not download artifact: {e}")
             else:
                 logger.info(f"found version from artifact: {version}")
                 print(version)  # print result to stdout
                 return
 
-    except urllib.error.HTTPError as e:
-        print(f"HTTP error occurred: {e.code} - {e.reason}")
+    except requests.exceptions.HTTPError as e:
+        print(
+            f"HTTP error occurred: {e.response.status_code if e.response else 'Unknown'} - {e}"
+        )
 
     logger.error(
         "\033[1;31m Unable to retrieve finished workflow run for this commit, wait for a previous build to finish before tagging. Exiting.\033[0m"

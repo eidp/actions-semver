@@ -117,8 +117,8 @@ jobs:
 
         echo "✅ Version artifact verified successfully"
 
-  test-promote-version-action:
-    name: Test Promote Version Action
+  test-fetch-commit-version-action:
+    name: Test Commit Version Action
     needs: test-generate-version-action
     runs-on: kubernetes-runner
     permissions:
@@ -128,32 +128,32 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v5
 
-    - name: Run promote-version action
-      id: promote
-      uses: ./promote-version
+    - name: Run commit-version action
+      id: fetch-commit-version
+      uses: ./fetch-commit-version
       env:
         LIST_ALL_WORKFLOWS: "true"  # To be able to retrieve artifacts from the current workflow run
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         github-token: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Verify promote-version output
+    - name: Verify fetch-fetch-commit-version output
       run: |
-        echo "Promoted version: ${{ steps.promote.outputs.version }}"
+        echo "Commit version: ${{ steps.fetch-commit-version.outputs.version }}"
 
         # Verify version is not empty
-        if [ -z "${{ steps.promote.outputs.version }}" ]; then
+        if [ -z "${{ steps.fetch-commit-version.outputs.version }}" ]; then
           echo "❌ ERROR: Promoted version is empty"
           exit 1
         fi
 
-        # Verify SEMVER_VERSION env variable is set
-        if [ -z "${SEMVER_VERSION}" ]; then
-          echo "❌ ERROR: SEMVER_VERSION environment variable is not set"
+        # Verify COMMIT_VERSION env variable is set
+        if [ -z "${COMMIT_VERSION}" ]; then
+          echo "❌ ERROR: COMMIT_VERSION environment variable is not set"
           exit 1
         fi
 
-        if [ "$SEMVER_VERSION" != "${{ steps.promote.outputs.version }}" ]; then
-            echo "❌ ERROR: SEMVER_VERSION environment variable ($SEMVER_VERSION) doesn't match output (${{ steps.promote.outputs.version }})"
+        if [ "$COMMIT_VERSION" != "${{ steps.fetch-commit-version.outputs.version }}" ]; then
+            echo "❌ ERROR: COMMIT_VERSION environment variable ($COMMIT_VERSION) doesn't match output (${{ steps.commit.outputs.version }})"
             exit 1
         fi
