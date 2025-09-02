@@ -135,7 +135,7 @@ jobs:
         LIST_RUNNING_WORKFLOWS: "true"  # To be able to retrieve artifacts from the current workflow run
       with:
         python-version: ${{ env.PYTHON_VERSION }}
-        github-token: ${{ env.GITHUB_TOKEN }}
+        github-token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Verify promote-version output
       run: |
