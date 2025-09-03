@@ -8,6 +8,8 @@ from typing import Any
 
 import requests
 
+from .github_auth_redirect_adapter import GitHubAuthRedirectAdapter
+
 logger = logging.getLogger(__name__)
 
 # Constants
@@ -133,52 +135,47 @@ def download_artifact(run_id: str, artifact_name: str) -> str:
             (ex.: https://docs.github.com/en/rest/actions/artifacts)
     """
     try:
+        session = None
         # Get artifact metadata
         target_artifact = _get_artifact_metadata(run_id, artifact_name)
         logger.info(
             f"Found artifact '{artifact_name}' with ID: {target_artifact['id']}"
         )
 
-        # Download URL
         download_url = f"{api_url}/repos/{repository}/actions/artifacts/{target_artifact['id']}/zip"
 
-        # First request: Get redirect URL without following it
-        response = requests.get(
-            download_url, headers=headers, allow_redirects=False, timeout=30
-        )
+        # Use requests session to handle redirects with proper auth header logic
+        session = requests.Session()
 
-        if response.status_code in (301, 302):
-            # Get the redirect URL
-            redirect_url = response.headers.get("Location")
-            if not redirect_url:
-                raise ValueError("Expected redirect but no Location header found")
+        # Mount the custom adapter
+        session.mount("http://", GitHubAuthRedirectAdapter(download_url, headers))
+        session.mount("https://", GitHubAuthRedirectAdapter(download_url, headers))
 
-            # Second request: Download from redirected URL without auth headers
-            redirect_response = requests.get(
-                redirect_url, headers={"User-Agent": "actions-semver/1.0"}, timeout=30
-            )
-            redirect_response.raise_for_status()
-            zip_content = redirect_response.content
-        else:
-            # If no redirect, use the response directly
-            response.raise_for_status()
-            zip_content = response.content
+        # Make the request with the session (will handle redirects automatically)
+        response = session.get(download_url, timeout=30)
+        response.raise_for_status()
 
         # Extract and return content
-        return _extract_zip_content(zip_content, artifact_name)
+        return _extract_zip_content(response.content, artifact_name)
 
     except requests.exceptions.HTTPError as e:
         if e.response and e.response.status_code == HTTP_FORBIDDEN:
             error_msg = (
                 f"403 Forbidden when downloading artifact '{artifact_name}'. "
-                f"This could be due to: "
-                f"1) Insufficient permissions (ensure GITHUB_TOKEN has 'actions:read' scope), "
-                f"2) Artifact has expired, "
-                f"3) Artifact is from a different repository or private repo without access. "
+                f"This could be due to: Insufficient permissions (ensure GITHUB_TOKEN has 'actions:read' scope), "
                 f"Original error: {e}"
             )
             raise ValueError(error_msg) from e
         raise
+    finally:
+        # Clean up session
+        try:
+            if session is not None:
+                session.close()
+        except (AttributeError, OSError) as e:
+            # Log the exception but don't let it propagate since we're in cleanup
+            # Only catch specific exceptions that might occur during session.close()
+            logger.warning(f"Failed to close session during cleanup: {e}")
 
 
 def main(commit_sha: str, artifact_name: str, workflow_name: str | None = None) -> None:

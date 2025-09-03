@@ -1,12 +1,7 @@
-[build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "github-semver"
-version = "1.0.0"
 description = "GitHub Actions semantic versioning tool"
-readme = "README.md"
+dynamic = ["version", "readme"]
 authors = [
     {name = "Your Name", email = "your.email@example.com"},
 ]
@@ -21,6 +16,16 @@ dev = [
     "pytest>=8.4.1",
     "ruff>=0.12.11",
 ]
+
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["github_semver"]
+
+[tool.setuptools.dynamic]
+readme = { file = ["README.md"] }
 
 [project.scripts]
 github-semver = "github_semver.run_semver:main"
