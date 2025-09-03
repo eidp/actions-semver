@@ -62,7 +62,7 @@ runs:
         echo "Using GITHUB_SHA: $COMMIT_SHA"
       fi
       
-      COMMIT_VERSION=$(uv run python -m github_semver.commit_version --commit-sha1 "$COMMIT_SHA" --artifact-name "${{ inputs.artifact-name }}" --workflow-name "${{ inputs.workflow-name }}")
+      COMMIT_VERSION=$(uv run python -m github_semver.commit_version --commit-sha "$COMMIT_SHA" --artifact-name "${{ inputs.artifact-name }}" --workflow-name "${{ inputs.workflow-name }}")
       echo "$COMMIT_VERSION" > version
       echo "version=$COMMIT_VERSION" >> $GITHUB_OUTPUT
       echo "COMMIT_VERSION=$COMMIT_VERSION" >> $GITHUB_ENV
