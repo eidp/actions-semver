@@ -97,13 +97,6 @@ runs:
       COMMIT_SHA="${{ steps.metadata.outputs.sha }}"
       SHORT_SHA="${COMMIT_SHA:0:8}"
 
-      # Determine RC mode status with proper icon
-      if [[ "${{ inputs.build-rc-semver }}" == "true" ]]; then
-        RC_STATUS="✅ Enabled"
-      else
-        RC_STATUS="❌ Disabled"
-      fi
-
       echo "## 🏗️ Version Generation Summary" >> $GITHUB_STEP_SUMMARY
       echo "" >> $GITHUB_STEP_SUMMARY
       echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
@@ -112,6 +105,5 @@ runs:
       echo "| 🔨 **Build Type** | $VERSION_TYPE |" >> $GITHUB_STEP_SUMMARY
       echo "| 🌿 **Branch** | \`${{ steps.metadata.outputs.branch }}\` |" >> $GITHUB_STEP_SUMMARY
       echo "| 📍 **Commit** | \`$SHORT_SHA\` |" >> $GITHUB_STEP_SUMMARY
-      echo "| 🚦 **RC Mode** | $RC_STATUS |" >> $GITHUB_STEP_SUMMARY
       echo "" >> $GITHUB_STEP_SUMMARY
       echo "> 🎉 **$VERSION_DESC** generated successfully!" >> $GITHUB_STEP_SUMMARY

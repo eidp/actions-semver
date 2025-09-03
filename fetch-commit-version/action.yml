@@ -89,9 +89,6 @@ runs:
       echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
       echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
       echo "| 📦 **Version** | \`${{ env.COMMIT_VERSION }}\` |" >> $GITHUB_STEP_SUMMARY
-      echo "| 🏷️ **Artifact** | \`${{ inputs.artifact-name }}\` |" >> $GITHUB_STEP_SUMMARY
-      echo "| 🔄 **Workflow** | \`${{ inputs.workflow-name }}\` |" >> $GITHUB_STEP_SUMMARY
-      echo "| 🌿 **Branch** | \`${{ steps.metadata.outputs.branch }}\` |" >> $GITHUB_STEP_SUMMARY
       echo "| 📍 **Commit** | \`$SHORT_SHA\` |" >> $GITHUB_STEP_SUMMARY
       echo "" >> $GITHUB_STEP_SUMMARY
       echo "> ✅ **Success!** Version retrieved from previous workflow run" >> $GITHUB_STEP_SUMMARY
