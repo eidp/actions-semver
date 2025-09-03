@@ -7,10 +7,6 @@ description: >
   
   The GitHub token needs to have `actions: read` permission to be able to access the workflow runs.
 inputs:
-  python-version:
-    description: 'Python version to use'
-    required: false
-    default: '3.13'
   github-token:
     description: 'GitHub token for API access'
     required: false
@@ -33,7 +29,7 @@ runs:
   - name: Set up Python
     uses: actions/setup-python@v5.6.0
     with:
-      python-version: ${{ inputs.python-version }}
+      python-version: '3.13'
 
   - name: Install UV
     uses: astral-sh/setup-uv@v6.6.1

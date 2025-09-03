@@ -4,10 +4,6 @@ description: >
   The generated version is then stored as `SEMVER_VERSION` environment variable, set as output of this action and finally stored as an artifact.
 
 inputs:
-  python-version:
-    description: 'Python version to use'
-    required: false
-    default: '3.13'
   build-rc-semver:
     description: 'Whether to build RC semver (adds rc suffix)'
     required: false
@@ -25,7 +21,7 @@ runs:
   - name: Set up Python
     uses: actions/setup-python@v5.6.0
     with:
-      python-version: ${{ inputs.python-version }}
+      python-version: '3.13'
 
   - name: Install UV
     uses: astral-sh/setup-uv@v4

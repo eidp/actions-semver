@@ -7,7 +7,6 @@ The generate-version action executes the [`run_semver.py`](../github_semver/run_
 
 |       Name      |                Description                |Required|Default|
 |-----------------|-------------------------------------------|--------|-------|
-| `python-version`|           Python version to use           |   No   | `3.13`|
 |`build-rc-semver`|Whether to build RC semver (adds rc suffix)|   No   | `true`|
 
 ## 📤 Outputs
