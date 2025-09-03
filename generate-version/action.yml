@@ -70,29 +70,44 @@ runs:
       path: version
 
   - name: 📋 Add to Job Summary
+    shell: bash
     run: |
-      # Determine build type and add appropriate emoji
+      # Determine version type based on branch and RC mode
       if [[ "${{ github.ref }}" == "refs/heads/${{ github.event.repository.default_branch }}" ]]; then
-        BUILD_TYPE="🎯 **Release Candidate Build**"
-        BUILD_DESC="Production-ready semantic version"
+        # Default branch - check RC mode to determine release type
+        if [[ "${{ inputs.build-rc-semver }}" == "true" ]]; then
+          VERSION_TYPE="🎯 **Release Candidate Build**"
+          VERSION_DESC="Pre-release version"
+        else
+          VERSION_TYPE="🚀 **Release Build**"
+          VERSION_DESC="Production-ready semantic version"
+        fi
       else
-        BUILD_TYPE="🔧 **Feature Build**"
-        BUILD_DESC="Development version with build metadata"
+        # Feature branch - always feature build regardless of RC mode
+        VERSION_TYPE="🔧 **Feature Build**"
+        VERSION_DESC="Development version with build metadata"
       fi
-      
+
       # Get short SHA for display
       COMMIT_SHA="${{ steps.commit-sha.outputs.sha }}"
       SHORT_SHA="${COMMIT_SHA:0:8}"
-      
+
+      # Determine RC mode status with proper icon
+      if [[ "${{ inputs.build-rc-semver }}" == "true" ]]; then
+        RC_STATUS="✅ Enabled"
+      else
+        RC_STATUS="❌ Disabled"
+      fi
+
       echo "## 🏗️ Version Generation Summary" >> $GITHUB_STEP_SUMMARY
       echo "" >> $GITHUB_STEP_SUMMARY
       echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
       echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
       echo "| 📦 **Generated Version** | \`${{ env.CHART_VERSION }}\` |" >> $GITHUB_STEP_SUMMARY
-      echo "| 🔨 **Build Type** | $BUILD_TYPE |" >> $GITHUB_STEP_SUMMARY
+      echo "| 🔨 **Build Type** | $VERSION_TYPE |" >> $GITHUB_STEP_SUMMARY
       echo "| 🌿 **Branch** | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
       echo "| 📍 **Commit** | \`$SHORT_SHA\` |" >> $GITHUB_STEP_SUMMARY
       echo "| 🐍 **Python** | \`${{ inputs.python-version }}\` |" >> $GITHUB_STEP_SUMMARY
-      echo "| 🚦 **RC Mode** | ${{ inputs.build-rc-semver == 'true' && '✅ Enabled' || '❌ Disabled' }} |" >> $GITHUB_STEP_SUMMARY
+      echo "| 🚦 **RC Mode** | $RC_STATUS |" >> $GITHUB_STEP_SUMMARY
       echo "" >> $GITHUB_STEP_SUMMARY
-      echo "> 🎉 **$BUILD_DESC** generated successfully!" >> $GITHUB_STEP_SUMMARY
+      echo "> 🎉 **$VERSION_DESC** generated successfully!" >> $GITHUB_STEP_SUMMARY
