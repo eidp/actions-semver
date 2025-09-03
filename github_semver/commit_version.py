@@ -40,7 +40,7 @@ def get_last_successful_workflow_for_commit(
     Use GitHub API to retrieve the last successful workflow run for a specific commit.
 
     Args:
-        commit_sha (str): full sha1 to search workflow runs for.
+        commit_sha (str): full sha to search workflow runs for.
         workflow_name (str, optional): name of the workflow to filter by.
 
     Returns:
@@ -181,18 +181,16 @@ def download_artifact(run_id: str, artifact_name: str) -> str:
         raise
 
 
-def main(
-    commit_sha1: str, artifact_name: str, workflow_name: str | None = None
-) -> None:
+def main(commit_sha: str, artifact_name: str, workflow_name: str | None = None) -> None:
     """Entrypoint for script that prints content of artifact
     generated in a workflow run that has previously run for commit with
-    given sha1.
+    given sha.
 
     This is useful in scenario's such as tagging existing commits, to allow reuse
     of previously generated artifacts.
 
     Args:
-        commit_sha1 (str): sha1 of commit for which a workflow run has run before.
+        commit_sha (str): sha of commit for which a workflow run has run before.
         artifact_name (str, optional): name of artifact to download from the given workflow run.
             Defaults to "version".
         workflow_name (str, optional): name of the workflow to filter by.
@@ -204,7 +202,7 @@ def main(
 
     try:
         last_workflow_run = get_last_successful_workflow_for_commit(
-            commit_sha1, workflow_name
+            commit_sha, workflow_name
         )
         if last_workflow_run:
             logger.info(
@@ -235,17 +233,17 @@ def main(
 
 
 if __name__ == "__main__":
-    sha1 = os.getenv("GITHUB_SHA")
+    github_sha = os.getenv("GITHUB_SHA")
     workflow = os.getenv("GITHUB_WORKFLOW")
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--commit-sha1",
+        "--commit-sha",
         help=(
-            "The full SHA of the commit for which you "
+            "The full hash of the commit for which you "
             "want to retrieve the version artifact."
         ),
-        default=sha1,
+        default=github_sha,
     )
     parser.add_argument(
         "--artifact-name", help="The name of the version artifact.", default="version"
@@ -257,4 +255,4 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    main(args.commit_sha1, args.artifact_name, args.workflow_name)
+    main(args.commit_sha, args.artifact_name, args.workflow_name)

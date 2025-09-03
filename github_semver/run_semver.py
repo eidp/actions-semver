@@ -49,24 +49,24 @@ def _extract_branch_and_sha() -> tuple[str, str]:
     if github_head_ref:
         # This is a pull request - use the head SHA, not the merge SHA
         branch = github_head_ref
-        sha1 = _get_pr_head_sha()
+        commit_sha = _get_pr_head_sha()
     elif github_ref.startswith("refs/heads/"):
         # This is a push to a branch - use GITHUB_SHA normally
         branch = github_ref_name
-        sha1 = os.environ["GITHUB_SHA"][:7]
+        commit_sha = os.environ["GITHUB_SHA"][:7]
     else:
         # Fallback to ref name
         branch = github_ref_name
-        sha1 = os.environ["GITHUB_SHA"][:7]
+        commit_sha = os.environ["GITHUB_SHA"][:7]
 
-    return branch, sha1
+    return branch, commit_sha
 
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
 
     try:
-        branch, sha1 = _extract_branch_and_sha()
+        branch, commit_sha = _extract_branch_and_sha()
 
         # Default branch name, defaulting to 'main' if not set
         default_branch = os.environ.get("REPO_DEFAULT_BRANCH", "main")
@@ -97,10 +97,10 @@ def main() -> None:
         logger.info("building on default branch, triggering a patch bump on latest tag")
         new_version = bump_patch(latest_tag)
         if build_rc_semver:
-            new_version = append_rc(new_version, sha1, build_number)
+            new_version = append_rc(new_version, commit_sha, build_number)
     else:
         logger.info("building on a feature branch, bump build number")
-        new_version = bump_build("0.0.0", branch, sha1, build_number)
+        new_version = bump_build("0.0.0", branch, commit_sha, build_number)
 
     logger.info(f"new version is {new_version}")
     print(new_version)
