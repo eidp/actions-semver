@@ -12,9 +12,10 @@ The generate-version action executes the [`run_semver.py`](../github_semver/run_
 
 ## 📤 Outputs
 
-|   Name  |        Description       |
-|---------|--------------------------|
-|`version`|Generated semantic version|
+|    Name    |                Description               |
+|------------|------------------------------------------|
+|  `version` |        Generated semantic version        |
+|`commit-sha`|The commit SHA used for version generation|
 
 ## 🚀 Usage
 

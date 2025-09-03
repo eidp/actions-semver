@@ -16,6 +16,9 @@ outputs:
   version:
     description: 'Generated semantic version'
     value: ${{ steps.generate.outputs.version }}
+  commit-sha:
+    description: 'The commit SHA used for version generation'
+    value: ${{ steps.metadata.outputs.sha }}
 runs:
   using: 'composite'
   steps:
