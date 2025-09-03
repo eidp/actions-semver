@@ -46,12 +46,9 @@ runs:
     run: |
       uv sync --frozen
 
-  - name: Fetch commit version
-    id: fetch-commit-version
+  - name: Determine commit SHA
+    id: commit-sha
     shell: bash
-    working-directory: ${{ github.action_path }}/..
-    env:
-      GITHUB_TOKEN: ${{ inputs.github-token }}
     run: |
       # Determine the correct commit SHA based on the event type
       if [[ "${{ github.event_name }}" == "pull_request" ]]; then
@@ -61,8 +58,34 @@ runs:
         COMMIT_SHA="${GITHUB_SHA}"
         echo "Using GITHUB_SHA: $COMMIT_SHA"
       fi
-      
-      COMMIT_VERSION=$(uv run python -m github_semver.commit_version --commit-sha "$COMMIT_SHA" --artifact-name "${{ inputs.artifact-name }}" --workflow-name "${{ inputs.workflow-name }}")
+      echo "sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
+
+  - name: Fetch commit version
+    id: fetch-commit-version
+    shell: bash
+    working-directory: ${{ github.action_path }}/..
+    env:
+      GITHUB_TOKEN: ${{ inputs.github-token }}
+    run: |
+      COMMIT_VERSION=$(uv run python -m github_semver.commit_version --commit-sha "${{ steps.commit-sha.outputs.sha }}" --artifact-name "${{ inputs.artifact-name }}" --workflow-name "${{ inputs.workflow-name }}")
       echo "$COMMIT_VERSION" > version
       echo "version=$COMMIT_VERSION" >> $GITHUB_OUTPUT
       echo "COMMIT_VERSION=$COMMIT_VERSION" >> $GITHUB_ENV
+
+  - name: 📋 Add to Job Summary
+    shell: bash
+    run: |
+      # Get short SHA for display
+      COMMIT_SHA="${{ steps.commit-sha.outputs.sha }}"
+      SHORT_SHA="${COMMIT_SHA:0:8}"
+
+      echo "## 🔍 Version Fetch Summary" >> $GITHUB_STEP_SUMMARY
+      echo "" >> $GITHUB_STEP_SUMMARY
+      echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+      echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+      echo "| 📦 **Version** | \`${{ env.COMMIT_VERSION }}\` |" >> $GITHUB_STEP_SUMMARY
+      echo "| 🏷️ **Artifact** | \`${{ inputs.artifact-name }}\` |" >> $GITHUB_STEP_SUMMARY
+      echo "| 🔄 **Workflow** | \`${{ inputs.workflow-name }}\` |" >> $GITHUB_STEP_SUMMARY
+      echo "| 📍 **Commit** | \`$SHORT_SHA\` |" >> $GITHUB_STEP_SUMMARY
+      echo "" >> $GITHUB_STEP_SUMMARY
+      echo "> ✅ **Success!** Version retrieved from previous workflow run" >> $GITHUB_STEP_SUMMARY

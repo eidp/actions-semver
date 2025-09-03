@@ -35,6 +35,21 @@ runs:
     run: |
       uv sync --frozen
 
+  - name: 🔍 Determine commit SHA
+    id: commit-sha
+    shell: bash
+    run: |
+      if [[ -n "${{ github.head_ref }}" ]]; then
+        # This is a pull request - use head SHA
+        COMMIT_SHA="${{ github.event.pull_request.head.sha }}"
+        echo "Using PR head SHA: $COMMIT_SHA"
+      else
+        # Regular push - use GITHUB_SHA
+        COMMIT_SHA="${GITHUB_SHA}"
+        echo "Using GITHUB_SHA: $COMMIT_SHA"
+      fi
+      echo "sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
+
   - name: Generate version
     id: generate
     shell: bash
@@ -53,3 +68,31 @@ runs:
     with:
       name: version
       path: version
+
+  - name: 📋 Add to Job Summary
+    run: |
+      # Determine build type and add appropriate emoji
+      if [[ "${{ github.ref }}" == "refs/heads/${{ github.event.repository.default_branch }}" ]]; then
+        BUILD_TYPE="🎯 **Release Candidate Build**"
+        BUILD_DESC="Production-ready semantic version"
+      else
+        BUILD_TYPE="🔧 **Feature Build**"
+        BUILD_DESC="Development version with build metadata"
+      fi
+      
+      # Get short SHA for display
+      COMMIT_SHA="${{ steps.commit-sha.outputs.sha }}"
+      SHORT_SHA="${COMMIT_SHA:0:8}"
+      
+      echo "## 🏗️ Version Generation Summary" >> $GITHUB_STEP_SUMMARY
+      echo "" >> $GITHUB_STEP_SUMMARY
+      echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+      echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+      echo "| 📦 **Generated Version** | \`${{ env.CHART_VERSION }}\` |" >> $GITHUB_STEP_SUMMARY
+      echo "| 🔨 **Build Type** | $BUILD_TYPE |" >> $GITHUB_STEP_SUMMARY
+      echo "| 🌿 **Branch** | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+      echo "| 📍 **Commit** | \`$SHORT_SHA\` |" >> $GITHUB_STEP_SUMMARY
+      echo "| 🐍 **Python** | \`${{ inputs.python-version }}\` |" >> $GITHUB_STEP_SUMMARY
+      echo "| 🚦 **RC Mode** | ${{ inputs.build-rc-semver == 'true' && '✅ Enabled' || '❌ Disabled' }} |" >> $GITHUB_STEP_SUMMARY
+      echo "" >> $GITHUB_STEP_SUMMARY
+      echo "> 🎉 **$BUILD_DESC** generated successfully!" >> $GITHUB_STEP_SUMMARY
