@@ -59,7 +59,6 @@ jobs:
       id: generate
       uses: ./generate-version
       with:
-        python-version: ${{ env.PYTHON_VERSION }}
         build-rc-semver: 'true'
 
     - name: Verify generate-version output
@@ -131,7 +130,6 @@ jobs:
       env:
         LIST_ALL_WORKFLOWS: "true"  # To be able to retrieve artifacts from the current workflow run
       with:
-        python-version: ${{ env.PYTHON_VERSION }}
         github-token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Verify fetch-fetch-commit-version output
