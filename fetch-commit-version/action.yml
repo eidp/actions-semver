@@ -1,11 +1,21 @@
 name: 'Fetch commit Version'
-description: >
+description: |
   The fetch-commit-version component executes the [`commit_version`](../github_semver/commit_version.py) script which 
   downloads the version artifact from the last successful workflow run for the current commit.
+
   The corresponding version is stored as `COMMIT_VERSION` environment variable and set as output of this action.
+
   This pipeline is supposed to be run for releases only.
-  
-  The GitHub token needs to have `actions: read` permission to be able to access the workflow runs.
+
+  This action requires a GitHub token with the following permissions:
+  ```yaml
+  permissions:
+    contents: read
+    actions: read
+  ```
+
+Author: EIDP
+
 inputs:
   github-token:
     description: 'GitHub token for API access'
@@ -42,24 +52,9 @@ runs:
     run: |
       uv sync --frozen
 
-  - name: 🔍 Determine commit SHA and branch
-    id: metadata
-    shell: bash
-    run: |
-      # Determine the correct commit SHA based on the event type
-      if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-        COMMIT_SHA="${{ github.event.pull_request.head.sha }}"
-        BRANCH_NAME="${{ github.head_ref }}"
-        echo "Using PR head SHA: $COMMIT_SHA"
-        echo "Using PR head ref: $BRANCH_NAME"
-      else
-        COMMIT_SHA="${GITHUB_SHA}"
-        BRANCH_NAME="${{ github.ref_name }}"
-        echo "Using GITHUB_SHA: $COMMIT_SHA"
-        echo "Using ref name: $BRANCH_NAME"
-      fi
-      echo "sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
-      echo "branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
+  - name: Get commit SHA
+    id: commit-sha
+    uses: eidp/actions-common/commit-sha@97d639c9b37f533fc0bb90edefc1c0b89e11c8c3
 
   - name: Fetch commit version
     id: fetch-commit-version
@@ -68,7 +63,7 @@ runs:
     env:
       GITHUB_TOKEN: ${{ inputs.github-token }}
     run: |
-      COMMIT_VERSION=$(uv run python -m github_semver.commit_version --commit-sha "${{ steps.metadata.outputs.sha }}" --artifact-name "${{ inputs.artifact-name }}" --workflow-name "${{ inputs.workflow-name }}")
+      COMMIT_VERSION=$(uv run python -m github_semver.commit_version --commit-sha "${{ steps.commit-sha.outputs.sha }}" --artifact-name "${{ inputs.artifact-name }}" --workflow-name "${{ inputs.workflow-name }}")
       echo "$COMMIT_VERSION" > version
       echo "version=$COMMIT_VERSION" >> $GITHUB_OUTPUT
       echo "COMMIT_VERSION=$COMMIT_VERSION" >> $GITHUB_ENV
@@ -76,15 +71,11 @@ runs:
   - name: 📋 Add to Job Summary
     shell: bash
     run: |
-      # Get short SHA for display
-      COMMIT_SHA="${{ steps.metadata.outputs.sha }}"
-      SHORT_SHA="${COMMIT_SHA:0:8}"
-
       echo "## 🔍 Version Fetch Summary" >> $GITHUB_STEP_SUMMARY
       echo "" >> $GITHUB_STEP_SUMMARY
       echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
       echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
       echo "| 📦 **Version** | \`${{ env.COMMIT_VERSION }}\` |" >> $GITHUB_STEP_SUMMARY
-      echo "| 📍 **Commit** | \`$SHORT_SHA\` |" >> $GITHUB_STEP_SUMMARY
+      echo "| 📍 **Commit** | \`${{ steps.commit-sha.outputs.short-sha }}\` |" >> $GITHUB_STEP_SUMMARY
       echo "" >> $GITHUB_STEP_SUMMARY
       echo "> ✅ **Success!** Version retrieved from previous workflow run" >> $GITHUB_STEP_SUMMARY

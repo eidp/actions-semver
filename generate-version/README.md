@@ -1,7 +1,9 @@
 <!-- NOTE: This file's contents are automatically generated. Do not edit manually. -->
 # Generate Version (Action)
 
-The generate-version action executes the [`run_semver.py`](../github_semver/run_semver.py) script. The generated version is then stored as `SEMVER_VERSION` environment variable, set as output of this action and finally stored as an artifact.
+The generate-version action executes the [`run_semver.py`](../github_semver/run_semver.py) script.
+
+The generated version is then stored as `SEMVER_VERSION` environment variable, set as output of this action and finally stored as an artifact.
 
 ## 🔧 Inputs
 
@@ -11,10 +13,9 @@ The generate-version action executes the [`run_semver.py`](../github_semver/run_
 
 ## 📤 Outputs
 
-|    Name    |                Description               |
-|------------|------------------------------------------|
-|  `version` |        Generated semantic version        |
-|`commit-sha`|The commit SHA used for version generation|
+|   Name  |        Description       |
+|---------|--------------------------|
+|`version`|Generated semantic version|
 
 ## 🚀 Usage
 

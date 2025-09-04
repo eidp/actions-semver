@@ -1,20 +1,21 @@
 name: 'Generate Version'
-description: >
+description: |
   The generate-version action executes the [`run_semver.py`](../github_semver/run_semver.py) script.
+
   The generated version is then stored as `SEMVER_VERSION` environment variable, set as output of this action and finally stored as an artifact.
+
+author: EIDP
 
 inputs:
   build-rc-semver:
     description: 'Whether to build RC semver (adds rc suffix)'
     required: false
     default: 'true'
+
 outputs:
   version:
     description: 'Generated semantic version'
-    value: ${{ steps.generate.outputs.version }}
-  commit-sha:
-    description: 'The commit SHA used for version generation'
-    value: ${{ steps.metadata.outputs.sha }}
+    value: ${{ steps.generate-version.outputs.version }}
 runs:
   using: 'composite'
   steps:
@@ -34,38 +35,18 @@ runs:
     run: |
       uv sync --frozen
 
-  - name: Determine commit SHA and branch
-    id: metadata
-    shell: bash
-    run: |
-      if [[ -n "${{ github.head_ref }}" ]]; then
-        # This is a pull request - use head SHA and head ref
-        COMMIT_SHA="${{ github.event.pull_request.head.sha }}"
-        BRANCH_NAME="${{ github.head_ref }}"
-        echo "Using PR head SHA: $COMMIT_SHA"
-        echo "Using PR head ref: $BRANCH_NAME"
-      else
-        # Regular push - use GITHUB_SHA and ref name
-        COMMIT_SHA="${GITHUB_SHA}"
-        BRANCH_NAME="${{ github.ref_name }}"
-        echo "Using GITHUB_SHA: $COMMIT_SHA"
-        echo "Using ref name: $BRANCH_NAME"
-      fi
-      echo "sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
-      echo "branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
-
   - name: Generate version
-    id: generate
+    id: generate-version
     shell: bash
     working-directory: ${{ github.action_path }}/..
     env:
       BUILD_RC_SEMVER: ${{ inputs.build-rc-semver }}
       REPO_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
     run: |
-      CHART_VERSION=$(uv run python -m github_semver.run_semver)
-      echo "$CHART_VERSION" > version
-      echo "version=$CHART_VERSION" >> $GITHUB_OUTPUT
-      echo "CHART_VERSION=$CHART_VERSION" >> $GITHUB_ENV
+      SEMVER_VERSION=$(uv run python -m github_semver.run_semver)
+      echo "$SEMVER_VERSION" > version
+      echo "version=$SEMVER_VERSION" >> $GITHUB_OUTPUT
+      echo "SEMVER_VERSION=$SEMVER_VERSION" >> $GITHUB_ENV
 
   - name: Upload version artifact
     uses: actions/upload-artifact@v4
@@ -92,17 +73,11 @@ runs:
         VERSION_DESC="Development version with build metadata"
       fi
 
-      # Get short SHA for display
-      COMMIT_SHA="${{ steps.metadata.outputs.sha }}"
-      SHORT_SHA="${COMMIT_SHA:0:8}"
-
       echo "## 🏗️ Version Generation Summary" >> $GITHUB_STEP_SUMMARY
       echo "" >> $GITHUB_STEP_SUMMARY
       echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
       echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
-      echo "| 📦 **Generated Version** | \`${{ env.CHART_VERSION }}\` |" >> $GITHUB_STEP_SUMMARY
+      echo "| 📦 **Generated Version** | \`${{ steps.generate-version.outputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
       echo "| 🔨 **Version Type** | $VERSION_TYPE |" >> $GITHUB_STEP_SUMMARY
-      echo "| 🌿 **Branch** | \`${{ steps.metadata.outputs.branch }}\` |" >> $GITHUB_STEP_SUMMARY
-      echo "| 📍 **Commit** | \`$SHORT_SHA\` |" >> $GITHUB_STEP_SUMMARY
       echo "" >> $GITHUB_STEP_SUMMARY
       echo "> 🎉 **$VERSION_DESC** generated successfully!" >> $GITHUB_STEP_SUMMARY

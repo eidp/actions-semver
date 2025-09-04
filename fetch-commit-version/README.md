@@ -1,8 +1,19 @@
 <!-- NOTE: This file's contents are automatically generated. Do not edit manually. -->
 # Fetch commit Version (Action)
 
-The fetch-commit-version component executes the [`commit_version`](../github_semver/commit_version.py) script which  downloads the version artifact from the last successful workflow run for the current commit. The corresponding version is stored as `COMMIT_VERSION` environment variable and set as output of this action. This pipeline is supposed to be run for releases only.
-The GitHub token needs to have `actions: read` permission to be able to access the workflow runs.
+The fetch-commit-version component executes the [`commit_version`](../github_semver/commit_version.py) script which 
+downloads the version artifact from the last successful workflow run for the current commit.
+
+The corresponding version is stored as `COMMIT_VERSION` environment variable and set as output of this action.
+
+This pipeline is supposed to be run for releases only.
+
+This action requires a GitHub token with the following permissions:
+```yaml
+permissions:
+  contents: read
+  actions: read
+```
 
 ## 🔧 Inputs
 
