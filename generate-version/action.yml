@@ -1,0 +1,84 @@
+name: 'Generate Version'
+description: |
+  The generate-version action executes the [`run_semver.py`](../github_semver/run_semver.py) script.
+
+  The generated version is then stored as `SEMVER_VERSION` environment variable, set as output of this action and finally stored as an artifact.
+
+author: EIDP
+
+inputs:
+  build-rc-semver:
+    description: 'Whether to build RC semver (adds rc suffix)'
+    required: false
+    default: 'true'
+
+outputs:
+  version:
+    description: 'Generated semantic version'
+    value: ${{ steps.generate-version.outputs.version }}
+
+runs:
+  using: 'composite'
+  steps:
+  - name: Set up Python
+    uses: actions/setup-python@v5.6.0
+    with:
+      python-version: '3.13'
+
+  - name: Install UV
+    uses: astral-sh/setup-uv@v4
+    with:
+      enable-cache: false # The UV lock file cannot be resolved when this action is included from another repository
+
+  - name: Install dependencies
+    shell: bash
+    working-directory: ${{ github.action_path }}/..
+    run: |
+      uv sync --frozen
+
+  - name: Generate version
+    id: generate-version
+    shell: bash
+    working-directory: ${{ github.action_path }}/..
+    env:
+      BUILD_RC_SEMVER: ${{ inputs.build-rc-semver }}
+      REPO_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+    run: |
+      SEMVER_VERSION=$(uv run python -m github_semver.run_semver)
+      echo "$SEMVER_VERSION" > version
+      echo "version=$SEMVER_VERSION" >> $GITHUB_OUTPUT
+      echo "SEMVER_VERSION=$SEMVER_VERSION" >> $GITHUB_ENV
+
+  - name: Upload version artifact
+    uses: actions/upload-artifact@v4
+    with:
+      name: version
+      path: version
+
+  - name: 📋 Add to Job Summary
+    shell: bash
+    run: |
+      # Determine version type based on branch and RC mode
+      if [[ "${{ github.ref }}" == "refs/heads/${{ github.event.repository.default_branch }}" ]]; then
+        # Default branch - check RC mode to determine release type
+        if [[ "${{ inputs.build-rc-semver }}" == "true" ]]; then
+          VERSION_TYPE="🎯 **Release Candidate Build**"
+          VERSION_DESC="Pre-release version"
+        else
+          VERSION_TYPE="🚀 **Release Build**"
+          VERSION_DESC="Production-ready semantic version"
+        fi
+      else
+        # Feature branch - always feature build regardless of RC mode
+        VERSION_TYPE="**Feature Build**"
+        VERSION_DESC="Development version with build metadata"
+      fi
+
+      echo "## 🏗️ Version Generation Summary" >> $GITHUB_STEP_SUMMARY
+      echo "" >> $GITHUB_STEP_SUMMARY
+      echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+      echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+      echo "| 📦 **Generated Version** | \`${{ steps.generate-version.outputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
+      echo "| 🔨 **Version Type** | $VERSION_TYPE |" >> $GITHUB_STEP_SUMMARY
+      echo "" >> $GITHUB_STEP_SUMMARY
+      echo "> 🎉 **$VERSION_DESC** generated successfully!" >> $GITHUB_STEP_SUMMARY

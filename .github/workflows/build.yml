@@ -1,0 +1,167 @@
+name: build
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+    branches:
+    - main
+
+env:
+  PYTHON_VERSION: "3.13"
+
+jobs:
+  lint-and-test:
+    runs-on: kubernetes-runner
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5.0.0
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v5.6.0
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install UV
+      uses: astral-sh/setup-uv@v6.6.1
+      with:
+        enable-cache: true
+ 
+    - name: Install dependencies
+      run: uv sync --frozen
+
+    - name: Run ruff linting
+      run: |
+        echo "Running ruff check..."
+        uv run ruff check
+        echo "Running ruff format check..."
+        uv run ruff format --check
+
+    - name: Run unit tests
+      run: |
+        echo "Running pytest..."
+        uv run pytest --verbose
+
+  test-generate-version-action:
+    runs-on: kubernetes-runner
+    outputs:
+      version: ${{ steps.generate.outputs.version }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5.0.0
+      with:
+        fetch-depth: 0
+
+    - name: Run generate-version action
+      id: generate
+      uses: ./generate-version
+      with:
+        build-rc-semver: 'true'
+
+    - name: Verify generate-version output
+      run: |
+        echo "Generated version: ${{ steps.generate.outputs.version }}"
+        
+        # Verify version is not empty
+        if [ -z "${{ steps.generate.outputs.version }}" ]; then
+          echo "❌ ERROR: Generated version is empty"
+          exit 1
+        fi
+
+        # Verify version file exists
+        if [ ! -f "version" ]; then
+          echo "❌ ERROR: Version file was not created"
+          exit 1
+        fi
+
+        # Verify version file content matches output
+        FILE_VERSION=$(cat version)
+        if [ "$FILE_VERSION" != "${{ steps.generate.outputs.version }}" ]; then
+          echo "❌ ERROR: Version file content ($FILE_VERSION) doesn't match output (${{ steps.generate.outputs.version }})"
+          exit 1
+        fi
+
+        # Verify version follows semantic versioning pattern
+        if ! echo "${{ steps.generate.outputs.version }}" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+'; then
+          echo "❌ ERROR: Version doesn't follow semantic versioning pattern"
+          exit 1
+        fi
+
+        echo "✅ Generate version action verified successfully"
+        echo "✅ Version: ${{ steps.generate.outputs.version }}"
+
+    - name: Download version artifact
+      uses: actions/download-artifact@v5
+      with:
+        name: version
+        path: ./artifacts
+
+    - name: Verify version artifact
+      run: |
+        if [ ! -f "./artifacts/version" ]; then
+          echo "❌ ERROR: Version artifact was not uploaded"
+          exit 1
+        fi
+
+        ARTIFACT_VERSION=$(cat ./artifacts/version)
+        if [ "$ARTIFACT_VERSION" != "${{ steps.generate.outputs.version }}" ]; then
+          echo "❌ ERROR: Artifact version ($ARTIFACT_VERSION) doesn't match generated version (${{ steps.generate.outputs.version }})"
+          exit 1
+        fi
+
+        echo "✅ Version artifact verified successfully"
+
+  test-fetch-commit-version-action:
+    needs: test-generate-version-action
+    runs-on: kubernetes-runner
+    permissions:
+      contents: read
+      actions: read
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5.0.0
+
+    - name: Run fetch-commit-version action
+      id: fetch-commit-version
+      uses: ./fetch-commit-version
+      env:
+        LIST_ALL_WORKFLOWS: "true"  # To be able to retrieve artifacts from the current workflow run
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Verify fetch-fetch-commit-version output
+      run: |
+        echo "Commit version: ${{ steps.fetch-commit-version.outputs.version }}"
+
+        # Verify version is not empty
+        if [ -z "${{ steps.fetch-commit-version.outputs.version }}" ]; then
+          echo "❌ ERROR: Promoted version is empty"
+          exit 1
+        fi
+
+        # Verify COMMIT_VERSION env variable is set
+        if [ -z "${COMMIT_VERSION}" ]; then
+          echo "❌ ERROR: COMMIT_VERSION environment variable is not set"
+          exit 1
+        fi
+
+        if [ "$COMMIT_VERSION" != "${{ steps.fetch-commit-version.outputs.version }}" ]; then
+            echo "❌ ERROR: COMMIT_VERSION environment variable ($COMMIT_VERSION) doesn't match output (${{ steps.fetch-commit-version.outputs.version }})"
+            exit 1
+        fi
+
+  check-workflow-status:
+    runs-on: kubernetes-runner
+    permissions:
+      contents: read
+      actions: read
+    steps:
+    - name: Check Workflow Status
+      id: check-workflow-status
+      uses: eidp/actions-common/check-workflow-status@v0.4.0
+      with:
+        jobs: 'lint-and-test,test-generate-version-action,test-fetch-commit-version-action'
+        github-token: ${{ secrets.GITHUB_TOKEN }}

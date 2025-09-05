@@ -1,0 +1,13 @@
+name: common
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  common:
+    uses: eidp/actions-common/.github/workflows/common.yml@1d37ef097c48440e0d87e70b0849bfa1b09cc961 # v0
+    permissions:
+      pull-requests: write
+      issues: write

@@ -1,0 +1,110 @@
+import json
+import logging
+import os
+import re
+import subprocess
+from pathlib import Path
+
+from .bumps import append_rc, bump_build, bump_patch
+
+logger = logging.getLogger(__name__)
+
+
+def _retrieve_latest_tag_from_git() -> str | None:
+    # raw tag is a line which is 'tab' separated, with hash on the left
+    # tag on the right. tag is in a refs/tags/0.0.x format.
+    raw_output = subprocess.check_output(
+        "git ls-remote --refs --tags --sort='-v:refname'",
+        shell=True,
+    ).decode()
+    logger.debug(f"shell output is: {raw_output}")
+    tag_lines = raw_output.splitlines()
+    for tag in tag_lines:
+        if semver_match := re.search(r"refs/tags/([0-9]+\..*)", tag):
+            return semver_match.group(1)
+
+    return None
+
+
+def _get_pr_head_sha() -> str:
+    """Extract the head SHA from pull request event data."""
+    github_event_path = os.environ.get("GITHUB_EVENT_PATH")
+    if github_event_path and Path(github_event_path).exists():
+        try:
+            with Path(github_event_path).open() as f:
+                event_data = json.load(f)
+            return event_data["pull_request"]["head"]["sha"][:7]
+        except (KeyError, FileNotFoundError, json.JSONDecodeError):
+            pass
+    # Fallback to GITHUB_SHA
+    return os.environ["GITHUB_SHA"][:7]
+
+
+def _extract_branch_and_sha() -> tuple[str, str]:
+    """Extract branch name and SHA based on GitHub context."""
+    github_ref = os.environ["GITHUB_REF"]
+    github_ref_name = os.environ.get("GITHUB_REF_NAME", "")
+    github_head_ref = os.environ.get("GITHUB_HEAD_REF", "")
+
+    if github_head_ref:
+        # This is a pull request - use the head SHA, not the merge SHA
+        branch = github_head_ref
+        commit_sha = _get_pr_head_sha()
+    elif github_ref.startswith("refs/heads/"):
+        # This is a push to a branch - use GITHUB_SHA normally
+        branch = github_ref_name
+        commit_sha = os.environ["GITHUB_SHA"][:7]
+    else:
+        # Fallback to ref name
+        branch = github_ref_name
+        commit_sha = os.environ["GITHUB_SHA"][:7]
+
+    return branch, commit_sha
+
+
+def main() -> None:
+    logging.basicConfig(level=logging.INFO)
+
+    try:
+        branch, commit_sha = _extract_branch_and_sha()
+
+        # Default branch name, defaulting to 'main' if not set
+        default_branch = os.environ.get("REPO_DEFAULT_BRANCH", "main")
+
+        # GitHub Actions run number as build number
+        build_number = os.environ["GITHUB_RUN_NUMBER"]
+
+        # if 'RC' building is enabled, 'rc' suffix will be added
+        # on generate semver.
+        build_rc_semver = os.getenv("BUILD_RC_SEMVER", "True").lower() in (
+            "true",
+            "1",
+            "yes",
+        )
+    except KeyError as e:
+        raise RuntimeError("expected environment values are not set.") from e
+
+    if default_branch == branch:
+        try:
+            if not (latest_tag := _retrieve_latest_tag_from_git()):
+                latest_tag = "0.0.1"
+            logger.info(f"latest tag is {latest_tag}")
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(
+                f"command '{e.cmd}' return with error (code {e.returncode}): {e.output}"
+            ) from e
+
+        logger.info("building on default branch, triggering a patch bump on latest tag")
+        new_version = bump_patch(latest_tag)
+        if build_rc_semver:
+            new_version = append_rc(new_version, commit_sha, build_number)
+    else:
+        logger.info("building on a feature branch, bump build number")
+        new_version = bump_build("0.0.0", branch, commit_sha, build_number)
+
+    logger.info(f"new version is {new_version}")
+    print(new_version)
+
+
+if __name__ == "__main__":
+    main()
