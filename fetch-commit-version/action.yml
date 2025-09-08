@@ -54,7 +54,7 @@ runs:
 
   - name: Get commit SHA
     id: commit-sha
-    uses: eidp/actions-common/commit-sha@fa0a4f4c1d2c75e12e203221dbb5639a6dc10d32
+    uses: eidp/actions-common/commit-sha@3bb94af604f12aec5d8d25e2d510c742b9d0987f
 
   - name: Fetch commit version
     id: fetch-commit-version
