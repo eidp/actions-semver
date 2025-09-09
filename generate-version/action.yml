@@ -39,12 +39,11 @@ runs:
   - name: Generate version
     id: generate-version
     shell: bash
-    working-directory: ${{ github.action_path }}/..
     env:
       BUILD_RC_SEMVER: ${{ inputs.build-rc-semver }}
       REPO_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
     run: |
-      SEMVER_VERSION=$(uv run python -m github_semver.run_semver)
+      SEMVER_VERSION=$(uv run --project ${{ github.action_path }}/.. python -m github_semver.run_semver)
       echo "$SEMVER_VERSION" > version
       echo "version=$SEMVER_VERSION" >> $GITHUB_OUTPUT
       echo "SEMVER_VERSION=$SEMVER_VERSION" >> $GITHUB_ENV
