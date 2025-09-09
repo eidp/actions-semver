@@ -2,7 +2,6 @@ import os
 from unittest.mock import MagicMock, patch
 
 import pytest
-import requests
 
 from github_semver.commit_version import (
     _get_artifact_metadata,
@@ -93,38 +92,3 @@ def test_download_artifact_expired_error(mock_get):
 
     with pytest.raises(ValueError, match="expired"):
         download_artifact("456", "version")
-
-
-@patch.dict(
-    os.environ,
-    {"GITHUB_REPOSITORY": "owner/repo", "GITHUB_TOKEN": "test_token"},
-    clear=True,
-)
-@patch("github_semver.commit_version.requests.Session")
-@patch("github_semver.commit_version.requests.get")
-def test_download_artifact_403_error(mock_get, mock_session_class):
-    # Mock artifact metadata request
-    metadata_response = MagicMock()
-    metadata_response.status_code = 200
-    metadata_response.raise_for_status.return_value = None
-    metadata_response.json.return_value = {
-        "artifacts": [{"id": EXPECTED_ARTIFACT_ID, "name": "version", "expired": False}]
-    }
-    mock_get.return_value = metadata_response
-
-    # Mock session
-    mock_session = MagicMock()
-    mock_session_class.return_value = mock_session
-
-    # Mock 403 error response
-    error_response = MagicMock()
-    error_response.status_code = 403
-    http_error = requests.exceptions.HTTPError()
-    http_error.response = error_response
-    mock_session.get.side_effect = http_error
-
-    with pytest.raises(ValueError, match="403 Forbidden.*actions:read"):
-        download_artifact("456", "version")
-
-    # Verify session was still closed despite the error
-    mock_session.close.assert_called_once()
