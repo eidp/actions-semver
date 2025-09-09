@@ -157,16 +157,6 @@ def download_artifact(run_id: str, artifact_name: str) -> str:
 
         # Extract and return content
         return _extract_zip_content(response.content, artifact_name)
-
-    except requests.exceptions.HTTPError as e:
-        if e.response and e.response.status_code == HTTP_FORBIDDEN:
-            error_msg = (
-                f"403 Forbidden when downloading artifact '{artifact_name}'. "
-                f"This could be due to: Insufficient permissions (ensure GITHUB_TOKEN has 'actions:read' scope), "
-                f"Original error: {e}"
-            )
-            raise ValueError(error_msg) from e
-        raise
     finally:
         # Clean up session
         try:
@@ -219,9 +209,17 @@ def main(commit_sha: str, artifact_name: str, workflow_name: str | None = None) 
                 return
 
     except requests.exceptions.HTTPError as e:
-        print(
-            f"HTTP error occurred: {e.response.status_code if e.response else 'Unknown'} - {e}"
-        )
+        if e.response and e.response.status_code == HTTP_FORBIDDEN:
+            error_msg = (
+                f"403 Forbidden when downloading artifact '{artifact_name}'. "
+                f"This could be due to: Insufficient permissions (ensure GITHUB_TOKEN has 'actions:read' scope), "
+                f"Original error: {e}"
+            )
+            logger.exception(error_msg)
+        else:
+            logger.exception(
+                f"HTTP error occurred: {e.response.status_code if e.response else 'Unknown'}"
+            )
 
     logger.error(
         "\033[1;31m Unable to retrieve finished workflow run for this commit, wait for a previous build to finish before tagging. Exiting.\033[0m"
