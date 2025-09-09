@@ -1,0 +1,31 @@
+changelog:
+  exclude:
+    labels:
+    - ignore-for-release
+    authors:
+    - octocat
+  categories:
+  - title: Breaking Changes 🛠
+    labels:
+    - BREAKING CHANGE
+  - title: Features ✨
+    labels:
+    - feature
+  - title: Enhancements 🚀
+    labels:
+    - enhancement
+    exclude:
+      labels:
+      - dependencies
+  - title: Bug Fixes 🐛
+    labels:
+    - bug
+  - title: Other Changes 📝
+    labels:
+    - "*"
+    exclude:
+      labels:
+      - dependencies
+  - title: Dependency Updates 📦
+    labels:
+    - dependencies
