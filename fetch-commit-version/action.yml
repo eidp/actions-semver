@@ -42,7 +42,7 @@ runs:
       python-version: '3.13'
 
   - name: Install UV
-    uses: astral-sh/setup-uv@557e51de59eb14aaaba2ed9621916900a91d50c6 # v6.6.1
+    uses: astral-sh/setup-uv@b75a909f75acd358c2196fb9a5f1299a9a8868a4 # v6.7.0
     with:
       enable-cache: false # The UV lock file cannot be resolved when this action is included from another repository
 
