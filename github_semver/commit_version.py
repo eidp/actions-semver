@@ -21,6 +21,9 @@ MAX_RETRIES = 5
 INITIAL_BACKOFF = 1.0  # seconds
 MAX_BACKOFF = 32.0  # seconds
 PER_PAGE = 100  # Maximum allowed by GitHub API
+# Waiting for workflows
+WORKFLOW_POLL_INTERVAL = 10  # seconds between polls
+MAX_WAIT_TIME = 1800  # 30 minutes maximum wait time
 
 api_url = os.getenv("GITHUB_API_URL", "https://api.github.com")
 repository = os.getenv("GITHUB_REPOSITORY")  # format: owner/repo
@@ -34,11 +37,18 @@ headers = (
     if github_token
     else {}
 )
-list_all_workflows = os.getenv("LIST_ALL_WORKFLOWS", "False").lower() in (
-    "true",
-    "1",
-    "yes",
-)
+
+
+def _should_allow_unfinished_workflows() -> bool:
+    """
+    Check if unfinished workflows should be allowed.
+    Used in CI pipelines to get version from running workflows.
+    """
+    return os.getenv("ALLOW_UNFINISHED_WORKFLOWS", "False").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
 
 
 def _parse_link_header(link_header: str | None) -> dict[str, str]:
@@ -138,6 +148,9 @@ def get_last_successful_workflow_for_commit(
     This function supports pagination to retrieve all workflow runs, not just the
     first page. It also includes retry logic with exponential backoff for rate limiting.
 
+    If ALLOW_UNFINISHED_WORKFLOWS is enabled, this function will return the most recent
+    workflow run regardless of its status (including in-progress workflows).
+
     Args:
         commit_sha (str): full sha to search workflow runs for.
         workflow_name (str, optional): name of the workflow to filter by.
@@ -148,40 +161,68 @@ def get_last_successful_workflow_for_commit(
     """
     logger.info(f"Searching for workflow runs for commit: {commit_sha}")
 
-    # Build initial URL with per_page parameter
+    allow_unfinished = _should_allow_unfinished_workflows()
+    if allow_unfinished:
+        logger.info("Checking for workflows including in_progress ones")
+
+    # Fetch all workflow runs with pagination
+    all_workflow_runs = _fetch_all_workflow_runs(
+        commit_sha, allow_unfinished=allow_unfinished
+    )
+
+    # Handle case when no workflows are found
+    if not all_workflow_runs:
+        return _handle_no_workflows_found(
+            commit_sha,
+            workflow_name,
+            allow_unfinished=allow_unfinished,
+        )
+
+    # Filter by workflow name if specified
+    if workflow_name:
+        all_workflow_runs = _filter_workflows_by_name(all_workflow_runs, workflow_name)
+        if not all_workflow_runs:
+            return _handle_no_workflows_found(
+                commit_sha,
+                workflow_name,
+                allow_unfinished=allow_unfinished,
+            )
+
+    # Sort workflow runs by ID (latest first)
+    sorted_runs = sorted(all_workflow_runs, key=lambda x: x["id"], reverse=True)
+
+    # Find the best workflow run based on configuration
+    return _find_best_workflow_run(
+        sorted_runs,
+        allow_unfinished=allow_unfinished,
+    )
+
+
+def _fetch_all_workflow_runs(
+    commit_sha: str, *, allow_unfinished: bool
+) -> list[dict[str, Any]]:
+    """Fetch all workflow runs for a commit with pagination."""
     base_url = f"{api_url}/repos/{repository}/actions/runs"
     params = f"?head_sha={commit_sha}&per_page={PER_PAGE}"
 
-    if not list_all_workflows:
+    if not allow_unfinished:
         params += "&status=success"
 
     url = base_url + params
-
-    if list_all_workflows:
-        logger.info("Checking for in_progress workflows")
-
     all_workflow_runs = []
     page_count = 0
-    total_fetched = 0
 
-    # Paginate through all results
     while url:
         page_count += 1
         logger.debug(f"Fetching page {page_count} from: {url}")
 
-        # Use retry logic for the request
         response = _make_request_with_retry(url, headers)
-
         data = response.json()
         page_runs = data.get("workflow_runs", [])
         all_workflow_runs.extend(page_runs)
-        total_fetched += len(page_runs)
 
-        logger.debug(
-            f"Page {page_count}: fetched {len(page_runs)} runs (total: {total_fetched})"
-        )
+        logger.debug(f"Page {page_count}: fetched {len(page_runs)} runs")
 
-        # Check for next page
         links = _parse_link_header(response.headers.get("Link"))
         url = links.get("next")
         if not url:
@@ -189,36 +230,64 @@ def get_last_successful_workflow_for_commit(
             break
 
     logger.info(
-        f"Found {len(all_workflow_runs)} total workflow runs for commit {commit_sha} across {page_count} page(s)"
+        f"Found {len(all_workflow_runs)} total workflow runs across {page_count} page(s)"
     )
+    return all_workflow_runs
 
-    if not all_workflow_runs:
-        logger.info(
-            f"No {'in progress' if list_all_workflows else 'successful'} workflow runs found for commit '{commit_sha}'"
-        )
+
+def _filter_workflows_by_name(
+    workflow_runs: list[dict[str, Any]], workflow_name: str
+) -> list[dict[str, Any]]:
+    """Filter workflow runs by workflow name."""
+    filtered = [run for run in workflow_runs if run.get("name") == workflow_name]
+    logger.info(f"Filtered to {len(filtered)} runs for workflow '{workflow_name}'")
+    return filtered
+
+
+def _find_best_workflow_run(
+    sorted_runs: list[dict[str, Any]],
+    *,
+    allow_unfinished: bool,
+) -> dict[str, Any] | None:
+    """Find the best workflow run based on the current configuration."""
+    if not sorted_runs:
         return None
 
-    # Filter by workflow name if specified
-    if workflow_name:
-        filtered_runs = [
-            run for run in all_workflow_runs if run.get("name") == workflow_name
-        ]
+    # Standard behavior: return most recent (should be successful)
+    if not allow_unfinished:
+        latest_run = sorted_runs[0]
+        logger.info(f"Returning most recent workflow run with ID: {latest_run['id']}")
+        return latest_run
 
-        if not filtered_runs:
-            logger.info(
-                f"No {'in progress' if list_all_workflows else 'successful'} workflow runs found for workflow '{workflow_name}'"
-            )
-            return None
-        all_workflow_runs = filtered_runs
-        logger.info(
-            f"Filtered to {len(all_workflow_runs)} runs for workflow '{workflow_name}'"
-        )
-
-    # Sort workflow runs by ID (latest first) and return the most recent
-    sorted_runs = sorted(all_workflow_runs, key=lambda x: x["id"], reverse=True)
+    # When allowing unfinished workflows, return the most recent one regardless of status
+    # This is used in CI pipelines to get version from the current running workflow
     latest_run = sorted_runs[0]
-    logger.info(f"Returning most recent workflow run with ID: {latest_run['id']}")
+    logger.info(
+        f"Returning most recent workflow run with ID: {latest_run['id']} "
+        f"(status: {latest_run.get('status')}, conclusion: {latest_run.get('conclusion')})"
+    )
     return latest_run
+
+
+def _handle_no_workflows_found(
+    commit_sha: str,
+    workflow_name: str | None,
+    *,
+    allow_unfinished: bool,
+) -> dict[str, Any] | None:
+    """Handle the case when no workflows are found."""
+    workflow_type = (
+        "workflows (including in_progress)" if allow_unfinished else "successful"
+    )
+
+    if workflow_name:
+        logger.info(
+            f"No {workflow_type} workflow runs found for workflow '{workflow_name}'"
+        )
+    else:
+        logger.info(f"No {workflow_type} workflow runs found for commit '{commit_sha}'")
+
+    return None
 
 
 def _get_artifact_metadata(run_id: str, artifact_name: str) -> dict[str, Any]:
@@ -357,9 +426,14 @@ def main(commit_sha: str, artifact_name: str, workflow_name: str | None = None) 
                 f"HTTP error occurred: {e.response.status_code if e.response else 'Unknown'}"
             )
 
-    logger.error(
-        "\033[1;31m Unable to retrieve finished workflow run for this commit, wait for a previous build to finish before tagging. Exiting.\033[0m"
-    )
+    if _should_allow_unfinished_workflows():
+        logger.error(
+            "\033[1;31m Unable to retrieve any workflow run for this commit after waiting. No workflows found or none completed successfully. Exiting.\033[0m"
+        )
+    else:
+        logger.error(
+            "\033[1;31m Unable to retrieve finished workflow run for this commit. Consider setting ALLOW_UNFINISHED_WORKFLOWS=true to wait for running builds. Exiting.\033[0m"
+        )
     sys.exit(1)
 
 

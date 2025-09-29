@@ -192,3 +192,61 @@ def test_get_workflow_with_name_filter(mock_get):
     assert result is not None
     assert result["id"] == 102  # The latest "build" workflow  # noqa: PLR2004
     assert result["name"] == "build"
+
+
+@patch.dict(
+    os.environ,
+    {
+        "GITHUB_REPOSITORY": "owner/repo",
+        "GITHUB_TOKEN": "test_token",
+        "ALLOW_UNFINISHED_WORKFLOWS": "true",
+    },
+    clear=True,
+)
+@patch("github_semver.commit_version.requests.get")
+def test_allow_unfinished_workflows_returns_in_progress(mock_get):
+    # Test that when ALLOW_UNFINISHED_WORKFLOWS=true, in-progress workflows are returned
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = {"Link": None}
+    mock_response.raise_for_status.return_value = None
+    mock_response.json.return_value = {
+        "workflow_runs": [
+            {"id": 100, "status": "in_progress", "conclusion": None},
+        ]
+    }
+    mock_get.return_value = mock_response
+
+    result = get_last_successful_workflow_for_commit("abc123")
+
+    assert result is not None
+    assert result["id"] == 100  # noqa: PLR2004
+    assert result["status"] == "in_progress"
+    # Should return immediately without waiting
+
+
+@patch.dict(
+    os.environ,
+    {"GITHUB_REPOSITORY": "owner/repo", "GITHUB_TOKEN": "test_token"},
+    clear=True,
+)
+@patch("github_semver.commit_version.requests.get")
+def test_standard_behavior_filters_successful_only(mock_get):
+    # Test that standard behavior (ALLOW_UNFINISHED_WORKFLOWS=false) filters for successful only
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = {"Link": None}
+    mock_response.raise_for_status.return_value = None
+    mock_response.json.return_value = {
+        "workflow_runs": [
+            {"id": 100, "status": "completed", "conclusion": "success"},
+        ]
+    }
+    mock_get.return_value = mock_response
+
+    result = get_last_successful_workflow_for_commit("abc123")
+
+    assert result is not None
+    # URL should have status=success filter when in standard mode
+    call_args = mock_get.call_args[0][0]
+    assert "status=success" in call_args

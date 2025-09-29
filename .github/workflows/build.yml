@@ -128,7 +128,7 @@ jobs:
       id: fetch-commit-version
       uses: ./fetch-commit-version
       env:
-        LIST_ALL_WORKFLOWS: "true"  # To be able to retrieve artifacts from the current workflow run
+        ALLOW_UNFINISHED_WORKFLOWS: "true"  # To be able to retrieve artifacts from the current workflow run
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
 
