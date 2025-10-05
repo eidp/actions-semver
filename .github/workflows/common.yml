@@ -7,7 +7,7 @@ on:
 
 jobs:
   common:
-    uses: eidp/actions-common/.github/workflows/common.yml@0878b81861674a916b2d0b8e66db5386cc95e066 # v0.6.2
+    uses: eidp/actions-common/.github/workflows/common.yml@b3f18025e8f40d4b367f4299899b85e3b36638af # v0.6.3
     with:
       runs-on: kubernetes-runner
     permissions:
