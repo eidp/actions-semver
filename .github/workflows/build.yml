@@ -161,7 +161,6 @@ jobs:
     steps:
     - name: Check Workflow Status
       id: check-workflow-status
-      uses: eidp/actions-common/check-workflow-status@b3f18025e8f40d4b367f4299899b85e3b36638af # v0.6.3
+      uses: eidp/actions-common/check-workflow-status@9e4d9960381d2e02ada4054ac8e1df3d1c61676f # v1.0.0
       with:
-        jobs: 'lint-and-test,test-generate-version-action,test-fetch-commit-version-action'
         github-token: ${{ secrets.GITHUB_TOKEN }}
