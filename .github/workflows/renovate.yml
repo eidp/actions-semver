@@ -4,9 +4,14 @@ on:
   - cron: '0/30 * * * *'
 jobs:
   renovate:
-    uses: eidp/actions-common/.github/workflows/renovate.yml@d526a4979e76d11ce42031c782a0c907b1126e24 # v1.1.0
-    with:
-      runs-on: dind-runner
-    secrets:
-      GITHUB_APP_ID: ${{ secrets.DEP_MANAGER_GITHUB_APP_ID }}
-      GITHUB_APP_PEM_FILE: ${{ secrets.DEP_MANAGER_GITHUB_APP_PEM_FILE }}
+    runs-on: dind-runner
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+    - name: Run Renovate
+      uses: eidp/actions-common/renovate@b1ae9db377e1e789ec4583ef3bf7a022ae4bfee4 # v1.1.1
+      with:
+        github-app-id: ${{ secrets.DEP_MANAGER_GITHUB_APP_ID }}
+        github-app-pem: ${{ secrets.DEP_MANAGER_GITHUB_APP_PEM_FILE }}
+        all-secrets: ${{ toJSON(secrets) }}
