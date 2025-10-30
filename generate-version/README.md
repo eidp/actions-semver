@@ -7,15 +7,15 @@ The generated version is then stored as `SEMVER_VERSION` environment variable, s
 
 ## 🔧 Inputs
 
-|       Name      |                Description                |Required|Default|
-|-----------------|-------------------------------------------|--------|-------|
-|`build-rc-semver`|Whether to build RC semver (adds rc suffix)|   No   | `true`|
+|Name              |Description                                 |Required|Default|
+|------------------|--------------------------------------------|--------|-------|
+|`build-rc-semver` |Whether to build RC semver (adds rc suffix) |No      |`true` |
 
 ## 📤 Outputs
 
-|   Name  |        Description       |
-|---------|--------------------------|
-|`version`|Generated semantic version|
+|Name      |Description                |
+|----------|---------------------------|
+|`version` |Generated semantic version |
 
 ## 🚀 Usage
 

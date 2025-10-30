@@ -17,17 +17,17 @@ permissions:
 
 ## 🔧 Inputs
 
-|      Name     |                                         Description                                         |Required|         Default        |
-|---------------|---------------------------------------------------------------------------------------------|--------|------------------------|
-| `github-token`|                                 GitHub token for API access                                 |   No   |  `${{ github.token }}` |
-|`artifact-name`|                                 Name of the version artifact                                |   No   |        `version`       |
-|`workflow-name`|Name of the workflow to retrieve the version artifact from. Defaults to the current workflow.|   No   |`${{ github.workflow }}`|
+|Name            |Description                                                                                   |Required|Default                  |
+|----------------|----------------------------------------------------------------------------------------------|--------|-------------------------|
+|`github-token`  |GitHub token for API access                                                                   |No      |`${{ github.token }}`    |
+|`artifact-name` |Name of the version artifact                                                                  |No      |`version`                |
+|`workflow-name` |Name of the workflow to retrieve the version artifact from. Defaults to the current workflow. |No      |`${{ github.workflow }}` |
 
 ## 📤 Outputs
 
-|   Name  |             Description             |
-|---------|-------------------------------------|
-|`version`|Retrieved semantic version for commit|
+|Name      |Description                           |
+|----------|--------------------------------------|
+|`version` |Retrieved semantic version for commit |
 
 ## 🚀 Usage
 
