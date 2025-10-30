@@ -21,7 +21,7 @@ def test_when_no_environment_variables_then_throw_error():
         "GITHUB_REF": "refs/heads/feature/abc-def",
         "GITHUB_REF_NAME": "feature/abc-def",
         "REPO_DEFAULT_BRANCH": "main",
-        "GITHUB_RUN_NUMBER": "1",
+        "GITHUB_RUN_ID": "1",
     },
     clear=True,
 )
@@ -43,7 +43,7 @@ def test_when_environment_variables_are_set_build_version_is_bumped(
         "GITHUB_REF": "refs/heads/feature/abc-def",
         "GITHUB_REF_NAME": "feature/abc-def",
         "REPO_DEFAULT_BRANCH": "main",
-        "GITHUB_RUN_NUMBER": "1",
+        "GITHUB_RUN_ID": "1",
     },
     clear=True,
 )
@@ -65,7 +65,7 @@ def test_when_no_tag_is_found_default_to_first_patch(mock_check_output, capsys):
         "GITHUB_REF": "refs/heads/main",
         "GITHUB_REF_NAME": "main",
         "REPO_DEFAULT_BRANCH": "main",
-        "GITHUB_RUN_NUMBER": "1",
+        "GITHUB_RUN_ID": "1",
     },
     clear=True,
 )
@@ -86,7 +86,7 @@ def test_when_run_on_default_branch_patch_bump_based_on_last_tag(
         "GITHUB_REF": "refs/heads/main",
         "GITHUB_REF_NAME": "main",
         "REPO_DEFAULT_BRANCH": "main",
-        "GITHUB_RUN_NUMBER": "1",
+        "GITHUB_RUN_ID": "1",
     },
     clear=True,
 )
@@ -106,7 +106,7 @@ def test_when_run_on_default_branch_without_tag_bump_to_0_0_2_rc(
         "GITHUB_REF": "refs/pull/123/merge",
         "GITHUB_HEAD_REF": "feature/my-feature",
         "REPO_DEFAULT_BRANCH": "main",
-        "GITHUB_RUN_NUMBER": "42",
+        "GITHUB_RUN_ID": "42",
     },
     clear=True,
 )
@@ -126,7 +126,7 @@ def test_when_run_on_pull_request_patch_bump_build_version(mock_check_output, ca
         "GITHUB_REF": "refs/pull/123/merge",
         "GITHUB_HEAD_REF": "feature/my-feature",
         "REPO_DEFAULT_BRANCH": "main",
-        "GITHUB_RUN_NUMBER": "42",
+        "GITHUB_RUN_ID": "42",
     },
     clear=True,
 )
@@ -148,7 +148,7 @@ def test_when_run_on_pull_request_without_tag_bump_to_first_patch(
         "GITHUB_REF": "refs/heads/main",
         "GITHUB_REF_NAME": "main",
         "REPO_DEFAULT_BRANCH": "main",
-        "GITHUB_RUN_NUMBER": "1",
+        "GITHUB_RUN_ID": "1",
         "BUILD_RC_SEMVER": "False",  # Disable RC building
     },
     clear=True,

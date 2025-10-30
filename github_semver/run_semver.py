@@ -71,8 +71,8 @@ def main() -> None:
         # Default branch name, defaulting to 'main' if not set
         default_branch = os.environ.get("REPO_DEFAULT_BRANCH", "main")
 
-        # GitHub Actions run number as build number
-        build_number = os.environ["GITHUB_RUN_NUMBER"]
+        # GitHub Actions run id as build number
+        build_number = os.environ["GITHUB_RUN_ID"]
 
         # if 'RC' building is enabled, 'rc' suffix will be added
         # on generate semver.
