@@ -10,7 +10,7 @@ jobs:
       uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
     - name: Run Renovate
-      uses: eidp/actions-common/renovate@08d38cb005f4e29eafd4071d1ac39a275380c31a # v1.3.1
+      uses: eidp/actions-common/renovate@8fb490fa25c3ae68beddc97b2430e5c586dc79e1 # v1.3.3
       with:
         github-app-id: ${{ secrets.DEP_MANAGER_GITHUB_APP_ID }}
         github-app-pem: ${{ secrets.DEP_MANAGER_GITHUB_APP_PEM_FILE }}
