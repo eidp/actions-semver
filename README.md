@@ -8,8 +8,8 @@ This repository contains GitHub Actions for managing semantic versioning (semver
 
 The following GitHub Actions are available in this repository:
 
-- [fetch-commit-version](fetch-commit-version/README.md)
 - [generate-version](generate-version/README.md)
+- [fetch-commit-version](fetch-commit-version/README.md)
 
 <!-- END ACTIONS -->
 

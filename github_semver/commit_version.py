@@ -218,21 +218,13 @@ def get_last_successful_workflow_for_commit(
 
     # Handle case when no workflows are found
     if not all_workflow_runs:
-        return _handle_no_workflows_found(
-            commit_sha,
-            workflow_name,
-            wait_for_success=wait_for_success,
-        )
+        return _handle_no_workflows_found(commit_sha, workflow_name)
 
     # Filter by workflow name if specified
     if workflow_name:
         all_workflow_runs = _filter_workflows_by_name(all_workflow_runs, workflow_name)
         if not all_workflow_runs:
-            return _handle_no_workflows_found(
-                commit_sha,
-                workflow_name,
-                wait_for_success=wait_for_success,
-            )
+            return _handle_no_workflows_found(commit_sha, workflow_name)
 
     # Sort workflow runs by ID (latest first)
     sorted_runs = sorted(all_workflow_runs, key=lambda x: x["id"], reverse=True)
