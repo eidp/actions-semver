@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 def _retrieve_latest_tag_from_git() -> str | None:
     # raw tag is a line which is 'tab' separated, with hash on the left
-    # tag on the right. tag is in a refs/tags/0.0.x format.
+    # tag on the right. tag is in a refs/tags/0.0.x or refs/tags/v0.0.x format.
     raw_output = subprocess.check_output(
         "git ls-remote --refs --tags --sort='-v:refname'",
         shell=True,
@@ -20,7 +20,8 @@ def _retrieve_latest_tag_from_git() -> str | None:
     logger.debug(f"shell output is: {raw_output}")
     tag_lines = raw_output.splitlines()
     for tag in tag_lines:
-        if semver_match := re.search(r"refs/tags/([0-9]+\..*)", tag):
+        # an optional leading 'v' is stripped so 0.0.1 and v0.0.1 both match.
+        if semver_match := re.search(r"refs/tags/v?([0-9]+\..*)", tag):
             return semver_match.group(1)
 
     return None
