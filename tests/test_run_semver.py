@@ -91,6 +91,25 @@ def test_when_run_on_default_branch_patch_bump_based_on_last_tag(
     clear=True,
 )
 @mock.patch.object(subprocess, "check_output")
+def test_when_tag_has_v_prefix_it_is_recognized_and_bumped(mock_check_output, capsys):
+    mock_check_output.return_value = b"b2984df042ba025c1f46f74eaea18945fc504e7a\trefs/tags/v1.0.0\nfcc84d34053e580507cb79583587b37812a21e10\trefs/tags/v0.0.1\n"
+
+    main()
+    assert capsys.readouterr().out == "1.0.1-rc.1+abababa\n"
+
+
+@mock.patch.dict(
+    os.environ,
+    {
+        "GITHUB_SHA": "abababababababababababababababababababab",
+        "GITHUB_REF": "refs/heads/main",
+        "GITHUB_REF_NAME": "main",
+        "REPO_DEFAULT_BRANCH": "main",
+        "GITHUB_RUN_NUMBER": "1",
+    },
+    clear=True,
+)
+@mock.patch.object(subprocess, "check_output")
 def test_when_run_on_default_branch_without_tag_bump_to_0_0_2_rc(
     mock_check_output, capsys
 ):
