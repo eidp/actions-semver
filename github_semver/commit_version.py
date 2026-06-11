@@ -141,7 +141,7 @@ def _make_request_with_retry(
 
 def _wait_for_workflow_completion(
     workflow_run: dict[str, Any],
-    max_wait_time: int = MAX_WAIT_TIME,
+    max_wait_time: float = MAX_WAIT_TIME,
 ) -> dict[str, Any] | None:
     """
     Wait for a specific workflow run to complete successfully.
@@ -197,6 +197,11 @@ def get_last_successful_workflow_for_commit(
     Always fetches both successful and in-progress workflows. If DO_NOT_WAIT_FOR_SUCCESS
     is set, immediately returns in-progress workflow. Otherwise, waits for them to complete.
 
+    When waiting and no run is associated with the commit yet, polls until one appears
+    or MAX_WAIT_TIME is reached. The commit-filtered runs endpoint lags behind run
+    creation, so a run triggered alongside the caller may not be listed on the first
+    request even though it exists.
+
     Args:
         commit_sha (str): full sha to search workflow runs for.
         workflow_name (str, optional): name of the workflow to filter by.
@@ -213,27 +218,34 @@ def get_last_successful_workflow_for_commit(
     else:
         logger.info("Will wait for workflows to complete successfully")
 
-    # Fetch all workflows and filter out failed ones
-    all_workflow_runs = _fetch_all_workflow_runs(commit_sha)
+    start_time = time.time()
+    while True:
+        # Fetch all workflows, filter out failed ones, then narrow by name.
+        all_workflow_runs = _fetch_all_workflow_runs(commit_sha)
+        if workflow_name:
+            all_workflow_runs = _filter_workflows_by_name(
+                all_workflow_runs, workflow_name
+            )
 
-    # Handle case when no workflows are found
-    if not all_workflow_runs:
-        return _handle_no_workflows_found(commit_sha, workflow_name)
+        if all_workflow_runs:
+            # Sort workflow runs by ID (latest first), then pick the best one.
+            sorted_runs = sorted(all_workflow_runs, key=lambda x: x["id"], reverse=True)
+            remaining = max(0.0, MAX_WAIT_TIME - (time.time() - start_time))
+            return _find_best_workflow_run(
+                sorted_runs,
+                wait_for_success=wait_for_success,
+                max_wait_time=remaining,
+            )
 
-    # Filter by workflow name if specified
-    if workflow_name:
-        all_workflow_runs = _filter_workflows_by_name(all_workflow_runs, workflow_name)
-        if not all_workflow_runs:
+        # No run is associated with the commit yet.
+        if not wait_for_success or time.time() - start_time >= MAX_WAIT_TIME:
             return _handle_no_workflows_found(commit_sha, workflow_name)
 
-    # Sort workflow runs by ID (latest first)
-    sorted_runs = sorted(all_workflow_runs, key=lambda x: x["id"], reverse=True)
-
-    # Find the best workflow run based on configuration
-    return _find_best_workflow_run(
-        sorted_runs,
-        wait_for_success=wait_for_success,
-    )
+        logger.info(
+            f"No workflow run listed for commit {commit_sha} yet, "
+            f"retrying in {WORKFLOW_POLL_INTERVAL}s"
+        )
+        time.sleep(WORKFLOW_POLL_INTERVAL)
 
 
 def _fetch_all_workflow_runs(
@@ -297,6 +309,7 @@ def _find_best_workflow_run(
     sorted_runs: list[dict[str, Any]],
     *,
     wait_for_success: bool,
+    max_wait_time: float = MAX_WAIT_TIME,
 ) -> dict[str, Any] | None:
     """Find the best workflow run based on the current configuration."""
     if not sorted_runs:
@@ -333,7 +346,7 @@ def _find_best_workflow_run(
         logger.info(
             f"Latest workflow run {latest_run['id']} has not finished yet, waiting for completion..."
         )
-        return _wait_for_workflow_completion(latest_run)
+        return _wait_for_workflow_completion(latest_run, max_wait_time)
 
     logger.info(
         f"No successful workflow runs found. Latest run {latest_run['id']} has status: {status}, conclusion: {conclusion}"

@@ -431,3 +431,79 @@ def test_waits_for_latest_workflow_only(mock_sleep, mock_get):  # noqa: ARG001
     # Second call should be to the specific workflow run endpoint
     second_call_url = mock_get.call_args_list[1][0][0]
     assert f"/actions/runs/{LATEST_IN_PROGRESS_WORKFLOW_ID}" in second_call_url
+
+
+@patch.dict(
+    os.environ,
+    {"GITHUB_REPOSITORY": "owner/repo", "GITHUB_TOKEN": "test_token"},
+    clear=True,
+)
+@patch("github_semver.commit_version.requests.get")
+@patch("github_semver.commit_version.time.sleep")
+def test_waits_for_workflow_run_to_appear(mock_sleep, mock_get):
+    # The commit-filtered runs endpoint lags behind run creation, so the run
+    # triggered alongside the caller is not listed on the first request.
+    empty_response = MagicMock()
+    empty_response.status_code = 200
+    empty_response.headers = {"Link": None}
+    empty_response.raise_for_status.return_value = None
+    empty_response.json.return_value = {"workflow_runs": []}
+
+    # On the next poll the run is listed, still in progress.
+    appeared_response = MagicMock()
+    appeared_response.status_code = 200
+    appeared_response.headers = {"Link": None}
+    appeared_response.raise_for_status.return_value = None
+    appeared_response.json.return_value = {
+        "workflow_runs": [
+            {
+                "id": LATEST_IN_PROGRESS_WORKFLOW_ID,
+                "name": "build",
+                "status": "in_progress",
+                "conclusion": None,
+            },
+        ]
+    }
+
+    # Polling that specific run shows it completed successfully.
+    completed_response = MagicMock()
+    completed_response.status_code = 200
+    completed_response.raise_for_status.return_value = None
+    completed_response.json.return_value = {
+        "id": LATEST_IN_PROGRESS_WORKFLOW_ID,
+        "name": "build",
+        "status": "completed",
+        "conclusion": "success",
+    }
+
+    mock_get.side_effect = [empty_response, appeared_response, completed_response]
+
+    result = get_last_successful_workflow_for_commit("abc123", workflow_name="build")
+
+    assert result is not None
+    assert result["id"] == LATEST_IN_PROGRESS_WORKFLOW_ID
+    # Slept once while waiting for the run to appear.
+    mock_sleep.assert_called_once()
+
+
+@patch.dict(
+    os.environ,
+    {"GITHUB_REPOSITORY": "owner/repo", "GITHUB_TOKEN": "test_token"},
+    clear=True,
+)
+@patch("github_semver.commit_version.MAX_WAIT_TIME", 0)
+@patch("github_semver.commit_version.requests.get")
+@patch("github_semver.commit_version.time.sleep")
+def test_returns_none_when_no_run_appears_before_timeout(mock_sleep, mock_get):
+    # No run is ever listed for the commit; the wait must be bounded.
+    empty_response = MagicMock()
+    empty_response.status_code = 200
+    empty_response.headers = {"Link": None}
+    empty_response.raise_for_status.return_value = None
+    empty_response.json.return_value = {"workflow_runs": []}
+    mock_get.return_value = empty_response
+
+    result = get_last_successful_workflow_for_commit("abc123", workflow_name="build")
+
+    assert result is None
+    mock_sleep.assert_not_called()
