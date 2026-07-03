@@ -87,8 +87,10 @@ An example of such a SemVer would be:
 
 - If no tag is set on the repository, the build will default to version **'0.0.1'**
 - It is a good practice to keep your branch name short and descriptive.
-  Technically a **semver** tag is allowed to have up to 255 characters, this will leave you with approx. 200 characters
-  for a branch name.
+  The branch name is slugified (non-alphanumeric characters removed) and truncated to the first 20 characters in the
+  build metadata. The commit SHA still makes every version unique, so this truncation only affects readability. It keeps
+  the generated version short enough for Kubernetes, which limits label values (such as Helm's `helm.sh/chart` label,
+  derived as `<chart-name>-<version>`) to 63 characters.
 
 ## Development
 

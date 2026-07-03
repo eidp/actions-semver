@@ -1,6 +1,13 @@
 import re
 from typing import NamedTuple
 
+# Kubernetes limits label values to 63 characters, and Helm derives the
+# `helm.sh/chart` label as `<chart-name>-<version>`. Branch names are otherwise
+# unbounded, so the slug embedded in the build metadata is capped to keep the
+# generated version short enough to fit. The commit SHA already makes each
+# version unique, so truncating the slug does not cause collisions.
+MAX_BRANCH_SLUG_LENGTH = 20
+
 
 class BuildInformation(NamedTuple):
     version: str
@@ -66,7 +73,7 @@ def bump_build(
         # 1.2.2-build.<X>+<branch_name>.<commit_sha1>
         version = bump_patch(version)
 
-    clean_branch = re.sub("[^A-Za-z0-9]+", "", branch_name)
+    clean_branch = re.sub("[^A-Za-z0-9]+", "", branch_name)[:MAX_BRANCH_SLUG_LENGTH]
 
     return "-".join(
         [version, "+".join([f"build.{build_number}", f"{clean_branch}.{commit_sha1}"])]

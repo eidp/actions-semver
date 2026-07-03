@@ -1,6 +1,7 @@
 import pytest
 
 from github_semver.bumps import (
+    MAX_BRANCH_SLUG_LENGTH,
     BuildInformation,
     _split_build_tag,
     append_rc,
@@ -197,14 +198,14 @@ class TestBumpBuild:
         """Test creating build version from basic version."""
         result = bump_build(BASIC_VERSION, BRANCH_NAME, COMMIT_SHA, BUILD_NUMBER)
 
-        expected = "1.2.4-build.42+featuremyawesomefeature.abc123def456"
+        expected = "1.2.4-build.42+featuremyawesomefeat.abc123def456"
         assert result == expected
 
     def test_bump_build_version_with_existing_build(self):
         """Test creating build version when build info already exists."""
         result = bump_build(VERSION_WITH_BUILD, BRANCH_NAME, COMMIT_SHA, BUILD_NUMBER)
 
-        expected = "1.2.3-build.42+featuremyawesomefeature.abc123def456"
+        expected = "1.2.3-build.42+featuremyawesomefeat.abc123def456"
         assert result == expected
 
     def test_bump_build_clean_branch_name(self):
@@ -212,14 +213,14 @@ class TestBumpBuild:
         dirty_branch = "feature/fix-issue#123@special-chars!"
         result = bump_build(BASIC_VERSION, dirty_branch, COMMIT_SHA, BUILD_NUMBER)
 
-        expected = "1.2.4-build.42+featurefixissue123specialchars.abc123def456"
+        expected = "1.2.4-build.42+featurefixissue123sp.abc123def456"
         assert result == expected
 
     def test_bump_build_with_string_build_number(self):
         """Test bump_build with string build number."""
         result = bump_build(BASIC_VERSION, BRANCH_NAME, COMMIT_SHA, "123")
 
-        expected = "1.2.4-build.123+featuremyawesomefeature.abc123def456"
+        expected = "1.2.4-build.123+featuremyawesomefeat.abc123def456"
         assert result == expected
 
     def test_bump_build_empty_branch_name(self):
@@ -233,7 +234,7 @@ class TestBumpBuild:
         """Test bump_build with empty commit SHA."""
         result = bump_build(BASIC_VERSION, BRANCH_NAME, "", BUILD_NUMBER)
 
-        expected = "1.2.4-build.42+featuremyawesomefeature."
+        expected = "1.2.4-build.42+featuremyawesomefeat."
         assert result == expected
 
     def test_bump_build_numeric_only_branch(self):
@@ -242,6 +243,22 @@ class TestBumpBuild:
 
         expected = "1.2.4-build.42+123456.abc123def456"
         assert result == expected
+
+    def test_bump_build_truncates_long_branch_name(self):
+        """Test that long branch slugs are truncated to keep versions short."""
+        long_branch = "feature/this-is-a-really-long-branch-name-that-exceeds-limits"
+        result = bump_build(BASIC_VERSION, long_branch, COMMIT_SHA, BUILD_NUMBER)
+
+        expected = "1.2.4-build.42+featurethisisareally.abc123def456"
+        assert result == expected
+
+    def test_bump_build_branch_slug_never_exceeds_max_length(self):
+        """The branch slug in the build metadata is capped at MAX_BRANCH_SLUG_LENGTH."""
+        long_branch = "a" * 100
+        result = bump_build(BASIC_VERSION, long_branch, COMMIT_SHA, BUILD_NUMBER)
+
+        slug = result.split("+", 1)[1].rsplit(".", 1)[0]
+        assert len(slug) == MAX_BRANCH_SLUG_LENGTH
 
 
 class TestAppendRc:
