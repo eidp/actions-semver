@@ -64,6 +64,7 @@ ignore = [
     "S602", # Error with subprocess in run_semver.py, currently there is no solution.
     "S603", # Error with subprocess in run_semver.py, currently there is no solution.
     "S607", # Error with subprocess in run_semver.py, currently there is no solution.
+    "CPY001", # We don't require copyright headers.
 ]
 
 
