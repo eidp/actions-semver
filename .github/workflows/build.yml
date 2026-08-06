@@ -13,7 +13,7 @@ env:
 
 jobs:
   lint-and-test:
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-latest
     steps:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -46,7 +46,7 @@ jobs:
         uv run pytest --verbose
 
   test-generate-version-action:
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.generate.outputs.version }}
     steps:
@@ -116,7 +116,7 @@ jobs:
 
   test-fetch-commit-version-action:
     needs: test-generate-version-action
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       actions: read
@@ -154,7 +154,7 @@ jobs:
         fi
 
   check-workflow-status:
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       actions: read
